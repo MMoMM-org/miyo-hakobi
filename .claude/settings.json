@@ -1,0 +1,5 @@
+{
+	"theme": "dark",
+	"sendTelemetry": false,
+	"claudeMdExcludes": ["claude-docker-home/**"]
+}

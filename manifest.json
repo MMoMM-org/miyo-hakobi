@@ -1,0 +1,14 @@
+{
+	"id": "miyo-hakobi",
+	"name": "MiYo Hakobi",
+	"version": "0.0.0",
+	"minAppVersion": "1.5.7",
+	"description": "Scheduled file ferry between local filesystem and your Obsidian vault — import voice memos / snippets / etc. into your inbox, export folders / tags / notes to external locations.",
+	"author": "Marcus Breiden <marcus@mmomm.org>",
+	"authorUrl": "https://www.mmomm.org",
+	"fundingUrl": {
+		"Buy Me a Coffee": "https://buymeacoffee.com/mmomm",
+		"GitHub Sponsor": "https://github.com/sponsors/MMoMM-org"
+	},
+	"isDesktopOnly": true
+}
