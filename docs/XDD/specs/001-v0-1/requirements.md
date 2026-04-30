@@ -132,7 +132,7 @@ None in v0.1. Hakobi is single-operator. No multi-user, shared-vault, or admin-v
 #### F4: Filename sanitization on import
 - **User Story:** As a vault owner, I want imported filenames sanitized before they enter my vault, so that exotic OS filenames don't break my vault paths or expose path-traversal risks.
 - **Acceptance Criteria:**
-  - [ ] Given an incoming filename, When sanitization runs, Then it is reduced to basename only; control chars (0x00–0x1F, 0x7F) are stripped; NUL bytes reject the file outright; `..`, `/`, `\` are stripped (basename only); leading/trailing dots and spaces are trimmed; OS-reserved names (`CON`, `PRN`, `AUX`, `NUL`, `COM1`–`COM9`, `LPT1`–`LPT9`, case-insensitive) are renamed by suffixing `-file`; segment length is capped at 255 UTF-8 bytes; total path length is capped at 1024 bytes.
+  - [ ] Given an incoming filename, When sanitization runs, Then it is reduced to basename only; control chars (0x00–0x1F, 0x7F) are stripped; NUL bytes reject the file outright; `..`, `/`, `\` are stripped (basename only); Obsidian-invalid characters (`*` `"` `\` `/` `<` `>` `:` `|` `?`) are replaced with `_` so the file lands with a vault-legal name; leading/trailing dots and spaces are trimmed; OS-reserved names (`CON`, `PRN`, `AUX`, `NUL`, `COM1`–`COM9`, `LPT1`–`LPT9`, case-insensitive) are renamed by suffixing `-file`; segment length is capped at 255 UTF-8 bytes; total path length is capped at 1024 bytes.
   - [ ] Given a sanitization rejection (NUL byte, attempted path traversal), Then the file is not transferred and an audit entry with `decision: rejected, reason: sanitization` is recorded.
   - [ ] Given a sanitized name that collides with an existing destination file, Then the rule's `onCollision` policy applies.
 
@@ -145,14 +145,14 @@ None in v0.1. Hakobi is single-operator. No multi-user, shared-vault, or admin-v
   - [ ] Given an audit log file that exceeds 10 MB OR is older than 90 days, When the next rotation check runs, Then the file is rotated/purged according to the configured retention policy (defaults: 10 MB size cap, 90 day age cap, both user-overridable).
   - [ ] Given the user clicks "Purge audit log now" in settings, Then all NDJSON files under `<pluginDataDir>/audit/` are deleted; one final entry is written to a fresh log file confirming the purge.
 
-#### F6: Audit-log viewer (in General settings tab)
-- **User Story:** As a vault owner, I want to view the audit log inside Hakobi's settings tab, so that I can scan recent runs without leaving Obsidian.
+#### F6: Audit-log access (button on General subtab)
+- **User Story:** As a vault owner, I want to open the audit log file in my OS default app from inside Hakobi's settings, so that I can inspect recent runs with whatever tool I prefer (text editor, grep, jq).
 - **Acceptance Criteria:**
-  - [ ] Given the General settings tab is open and the Audit log section is expanded, Then entries from the most recent NDJSON file are rendered newest-first, paginated to a fixed page size (50 entries) so the UI thread stays responsive.
-  - [ ] Given the viewer renders an entry, Then it shows metadata fields only (since no content is logged); failure rows are expandable to show per-file outcomes.
-  - [ ] Given the viewer is open, Then a filter bar lets the user filter by rule (dropdown of known rule names) and by outcome (All / Success / Failure / Dry run).
-  - [ ] Given the user clicks "Reveal log file", Then the OS file explorer opens at the audit log directory.
-  - [ ] Given the user clicks "Purge audit log now", Then a confirm dialog requires explicit acknowledgment before purge proceeds.
+  - [ ] Given the General subtab is open, Then a "Show audit log" button is visible.
+  - [ ] Given the user clicks "Show audit log" and the current month's NDJSON file exists, Then Hakobi launches that file in the OS default app for `.ndjson`.
+  - [ ] Given the user clicks "Show audit log" but no audit log file has been created yet, Then a Notice "No audit log entries yet" appears and no launch is attempted.
+  - [ ] Given the user clicks "Purge audit log now", Then a confirm dialog requires explicit acknowledgment before purge proceeds; on confirm, all NDJSON files under `<pluginDataDir>/audit/` are deleted and a single new entry is written confirming the purge.
+  - [ ] Given v0.1, Then there is no in-tab audit-log viewer, no pagination UI, no filter bar — file inspection is delegated to the OS default app.
 
 #### F7: Command-palette commands
 - **User Story:** As a vault owner, I want command-palette commands for triggering and running rules manually, so that I can force a transfer without waiting for the next tick.
@@ -187,7 +187,7 @@ None in v0.1. Hakobi is single-operator. No multi-user, shared-vault, or admin-v
 - **Acceptance Criteria:**
   - [ ] Given the plugin is loaded, Then the status bar shows the Hakobi kanji (運) as a single glyph, color-coded for state: neutral (idle), accent color (running), error color (last run failed). No text labels in the status-bar item itself — colors carry state.
   - [ ] Given the user hovers the status-bar item, Then a tooltip appears containing readable detail: state name, name of the rule currently running (if any), timestamp of the last run, and a one-line summary of the last outcome ("4 files imported" / "2 of 4 files imported, see audit log" / etc.). The tooltip is the only place state is written in words.
-  - [ ] Given the user clicks the status-bar item, Then the Hakobi settings tab opens scrolled to the Audit log section.
+  - [ ] Given the user clicks the status-bar item, Then the Hakobi settings tab opens on the General subtab (where the "Show audit log" button lives).
   - [ ] Given a rule run completes with failure, Then the status-bar item turns the error color and remains in that state until the user clicks the status bar OR the next successful run completes.
   - [ ] Given accessibility, Then the status-bar item has an `aria-label` with the same text content as the tooltip, so screen-reader users get state without relying on color.
 

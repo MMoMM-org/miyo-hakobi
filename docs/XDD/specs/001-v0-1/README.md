@@ -5,7 +5,7 @@
 | Field | Value |
 |-------|-------|
 | **Created** | 2026-04-30 |
-| **Current Phase** | SDD |
+| **Current Phase** | PLAN |
 | **Last Updated** | 2026-04-30 |
 
 ## Documents
@@ -13,8 +13,8 @@
 | Document | Status | Notes |
 |----------|--------|-------|
 | requirements.md | completed | PRD approved 2026-04-30 after one review pass (6 inline notes consumed) |
-| solution.md | in_progress | SDD — design for import/export rules + scheduler + audit log |
-| plan/ | pending | PLAN — phased implementation tasks |
+| solution.md | completed | SDD approved 2026-04-30 after one review pass (2 inline notes consumed); 12/12 ADRs confirmed |
+| plan/ | in_progress | PLAN — phased implementation tasks |
 
 **Status values**: `pending` | `in_progress` | `completed` | `skipped`
 
@@ -40,6 +40,12 @@
 | 2026-04-30 | PRD review: F8 explicitly states no multi-device enablement coordination | Hakobi does not detect/coordinate when multiple devices have the same rule enabled — user's responsibility. Avoids cross-device locking complexity. |
 | 2026-04-30 | PRD review: F10 status-bar = kanji 運 with color states + hover tooltip | Owner decision; replaces the "Hakobi: idle / running / failed" text. Kanji + color carry state; tooltip carries detail; aria-label preserves accessibility. |
 | 2026-04-30 | PRD review: source-side recursion is the default for both directions; new `flattenOnTarget` option | Owner decision; replaces the per-rule `recurse` toggle on F2 and removes the "immediate root only" restriction on F1. Resolves the previously-deferred "folder-rule recursion default" open question (recursion is now baseline behavior, not a toggle). |
+| 2026-04-30 | SDD review: settings UI = 3 subtabs (General / Import / Export) + manifest-driven header section; mirrors miyo-kado | Owner decision; recognizable across MiYo ecosystem. Header surfaces author/docs/funding URLs from manifest.json so they cannot drift from the Community Plugins listing. |
+| 2026-04-30 | SDD review: drop in-tab audit-log viewer; replace with "Show audit log" button on General subtab | Owner decision; pushes inspection to OS default app (text editor / grep / jq). PRD F6 rewritten — no pagination, no filter bar, no virtualized rendering. Major scope reduction. |
+| 2026-04-30 | SDD review: F10 status-bar click target = General subtab (not "scrolled to audit-log section") | Cascades from the previous decision — there is no audit-log section to scroll to anymore. |
+| 2026-04-30 | SDD review: sanitize pipeline must replace Obsidian-invalid chars (`*"\\/<>:|?`) with `_` | Owner-flagged omission; Obsidian's note-create API rejects these even when the OS allows them. F4 acceptance criterion in PRD updated; sanitize.ts reference impl gains a step 5. |
+| 2026-04-30 | SDD review: ADRs 1, 2, 3, 8, 9, 11, 12 confirmed inline by owner; ADRs 4, 5, 6, 7, 10 still pending | Inline `[X]` checkbox marks treated as approval signal. ADR-10 was rewritten in this review pass (3-subtab IA + audit-log button) and remains pending. |
+| 2026-04-30 | ADRs 4, 5, 6, 7, 10 approved as drafted | All 12 ADRs now confirmed; SDD complete. ADR-4 (audit log path = rule-root-relative), ADR-5 (path expansion at config save), ADR-6 (mtime preserve on export only), ADR-7 (UUID v4 rule ID), ADR-10 (3-subtab IA). |
 
 ## Context
 
