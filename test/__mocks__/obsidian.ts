@@ -60,6 +60,7 @@ export class App {
 		getMarkdownFiles: vi.fn(() => [] as TFile[]),
 		getFiles: vi.fn(() => [] as TFile[]),
 		getAllLoadedFiles: vi.fn(() => [] as (TFile | TFolder)[]),
+		createFolder: vi.fn(async (_path: string) => {}),
 		adapter: {
 			read: vi.fn(),
 			write: vi.fn(),
@@ -75,6 +76,7 @@ export class App {
 	};
 	workspace = {
 		getActiveViewOfType: vi.fn(),
+		getActiveFile: vi.fn((): TFile | null => null),
 		on: vi.fn(),
 		off: vi.fn(),
 		getLeavesOfType: vi.fn(() => []),
