@@ -8,8 +8,13 @@
 //      and free of side-effect imports.
 //   2. No Phase 1 source file performs network IO. Constitution L1
 //      (Privacy & Security) forbids silent network surfaces; this test
-//      catches a `fetch(`, `http://`, `https://`, `XMLHttpRequest`,
-//      `WebSocket(` slipping into a domain/audit/fs/vault/runner module.
+//      catches a network-call CALLSITE — `fetch(`, `XMLHttpRequest`,
+//      `WebSocket(` — slipping into a domain/audit/fs/vault/runner
+//      module. URL-literal patterns (`http://`, `https://`) are
+//      deliberately not scanned: any real network call still needs one
+//      of the callsite primitives above, and a quote-aware scanner to
+//      separate URL literals from line comments would add complexity
+//      without protection.
 //
 // The walks use Node's `fs/promises`, which is fine in tests but would be
 // disallowed inside the modules we are scanning.
@@ -128,7 +133,7 @@ describe("Phase 1 invariants", () => {
 		});
 	});
 
-	describe("Phase 1 source has no remote URL surface", () => {
+	describe("Phase 1 source has no network-call callsites", () => {
 		// Pre-collect the files once for the grep test.
 		const collectFiles = async (): Promise<string[]> => {
 			const all: string[] = [];
@@ -145,13 +150,19 @@ describe("Phase 1 invariants", () => {
 			return all;
 		};
 
-		it("contains no fetch( / http:// / https:// / XMLHttpRequest / WebSocket( in non-comment code", async () => {
+		it("contains no fetch( / XMLHttpRequest / WebSocket( in non-comment code", async () => {
 			const files = await collectFiles();
 			expect(files.length).toBeGreaterThan(0);
+			// Only network-call CALLSITES are scanned. URL literals
+			// (`http://`, `https://`) are intentionally excluded — they
+			// cannot perform IO on their own and would require a
+			// quote-aware scanner to distinguish from line comments
+			// (the trailing `//` clip in `stripComments` collapses
+			// `"https://..."` to `"https:"` and makes URL patterns
+			// pass vacuously). Any real network IO still hits one of
+			// the callsite primitives below.
 			const patterns: { name: string; re: RegExp }[] = [
 				{ name: "fetch(", re: /\bfetch\s*\(/ },
-				{ name: "http://", re: /http:\/\// },
-				{ name: "https://", re: /https:\/\// },
 				{ name: "XMLHttpRequest", re: /\bXMLHttpRequest\b/ },
 				{ name: "WebSocket(", re: /\bWebSocket\s*\(/ },
 			];
