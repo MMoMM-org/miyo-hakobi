@@ -1180,7 +1180,7 @@ EARS-format system-level criteria translating PRD acceptance scenarios:
 **Main Flow Criteria: Export rule (PRD/F2)**
 - [ ] WHEN a scheduler tick fires for an enabled export folder rule, THE SYSTEM SHALL enumerate the vault subtree recursively via the Vault API and write each note to the destination FS path via raw `fs/promises`.
 - [ ] WHEN the rule type is `tag`, THE SYSTEM SHALL select notes via the metadata cache using `tagMatch: any | all`.
-- [ ] WHEN the rule type is `note`, THE SYSTEM SHALL export exactly the configured note path or fail with `source-note-missing`.
+- [ ] WHEN the rule type is `note`, THE SYSTEM SHALL export exactly the configured note path or fail with `source-not-found`.
 
 **Scheduler Criteria (PRD/F3)**
 - [ ] WHILE a rule has `enabledOnThisDevice: true`, THE SYSTEM SHALL fire its tick every `everyMinutes` minutes via `registerInterval`.

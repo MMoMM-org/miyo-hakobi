@@ -93,7 +93,7 @@ This phase glues the engine and UI into observably-correct behavior, hardens the
      - [x] Zero lint errors / zero lint warnings `[ref: SDD/CON-10]`
      - [x] No network APIs in the bundle (grep-based) `[ref: SDD/CON-1, Constitution L1]`
 
-- [ ] **T4.7 Spec compliance final sweep** `[activity: validate]`
+- [x] **T4.7 Spec compliance final sweep** `[activity: validate]`
 
   Depends on T4.1–T4.6.
 
@@ -102,8 +102,14 @@ This phase glues the engine and UI into observably-correct behavior, hardens the
   3. Implement: a single `test/spec/compliance.test.ts` that snapshots: list of registered commands, list of audit log fields, list of bundled files, presence of the `register*` cleanups in main.ts. Snapshot prevents accidental drift.
   4. Validate: full gate.
   5. Success:
-     - [ ] PRD F1–F12 each map to ≥ 1 passing test `[ref: PRD]`
-     - [ ] SDD ADR-1..12 each verified or deviation-logged `[ref: SDD]`
+     - [x] PRD F1–F12 each map to ≥ 1 passing test `[ref: PRD]`
+     - [x] SDD ADR-1..12 each verified or deviation-logged `[ref: SDD]`
+
+  Outcomes (2026-05-01):
+   - Defect A (T4.3) FIXED: ExportRunner.run pre-checks note existence before scope validation; the typed `errorCode: source-not-found` now flows through to the audit log instead of `unknown` for missing-source export-note rules. Live test (`test/live/export.live.test.ts`) updated.
+   - Defect B (T4.5) DEFERRED to v0.2 with a Decisions Log entry in the spec README and a troubleshooting note in `README.md`. The `Export this note` command remains a registered no-op in v0.1 (safer than wrong-rule routing).
+   - PRD/F2 wording reconciled to the canonical `source-not-found` ErrorCode (was `source-note-missing` in PRD draft); SDD acceptance criterion updated in step.
+   - Compliance test: `test/spec/compliance.test.ts` (60 tests) — 7 sections covering registered commands, audit field allowlist, bundled files, register* discipline, F#→test mapping, ADR→impl mapping, and won't-have absences.
 
 - [ ] **T4.8 Phase 4 Validation & ship-ready check** `[activity: validate]`
 

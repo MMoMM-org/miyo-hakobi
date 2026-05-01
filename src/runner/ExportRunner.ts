@@ -94,6 +94,29 @@ export class ExportRunner {
     const dryRun = opts?.dryRun ?? rule.dryRun;
     const ts = this.nowFn().toISOString();
 
+    // Step 0 (note rules only): existence pre-check.
+    //
+    // PRD/F2: an export-note rule whose configured note no longer exists must
+    // produce a single rule-level failure with errorCode `source-not-found`.
+    // Without this pre-check, the downstream `validateRuleAtRunTime` calls
+    // `fs.lstat` on the resolved vault path BEFORE enumerateNote runs;
+    // that lstat throws IoNotFoundError, the throw escapes ExportRunner.run
+    // uncaught, and Scheduler.executeTick's catch-all converts it to a generic
+    // `errorCode: "unknown"` audit entry. The user-facing F2 acceptance
+    // criterion is therefore not observable. We pre-check existence here so
+    // the typed errorCode is emitted reliably regardless of how the scope
+    // validator reacts to a non-existent path. Only note rules need this —
+    // folder/tag rules tolerate an empty source naturally (rule-ok with no
+    // files) and the scope validator treats their roots (folder/vault root)
+    // as always present.
+    if (rule.sourceType === "note") {
+      const file = this.vaultIo.fileByPath(rule.sourceVaultNotePath);
+      if (file === null) {
+        await this.appendRuleFailed(rule, ts, "source-not-found");
+        return;
+      }
+    }
+
     // Step 1: scope validation.
     const scopeResult = await this.validateScope(rule);
     if (!scopeResult.ok) {

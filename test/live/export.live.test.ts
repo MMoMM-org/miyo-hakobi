@@ -435,25 +435,17 @@ describe("export.live — vault-backed E2E", () => {
 	// -------------------------------------------------------------------------
 	// Single-note export — missing source → rule-failed.
 	//
-	// Spec (PRD/F2) calls the failure `source-note-missing`. The closed
-	// ErrorCode enum has `source-not-found` and ExportRunner.enumerateNote
-	// emits exactly that on a missing note.
+	// PRD/F2 originally specified `reason: source-note-missing`; the SDD
+	// closed ErrorCode enum settled on `source-not-found` (single canonical
+	// name for any missing-source failure). T4.7 reconciled the PRD wording
+	// to match the enum (see Decisions Log entry dated 2026-05-01).
 	//
-	// Defect (reported for T4.7 / spec compliance sweep):
-	//   `validateRuleAtRunTime` (src/domain/scope.ts) calls `fs.lstat` on the
-	//   resolved source root BEFORE ExportRunner.enumerateNote runs. For an
-	//   export-note rule whose `sourceVaultNotePath` does not exist, that
-	//   lstat throws IoNotFoundError; the error escapes ExportRunner.run
-	//   uncaught, and Scheduler.executeTick's catch-all emits a generic
-	//   `errorCode: "unknown"` rule-failed entry — not the typed
-	//   `source-not-found` (let alone the spec-named `source-note-missing`).
-	//   The user-facing F2 acceptance criterion ("rule-level failure with
-	//   reason source-note-missing") is therefore not observable today.
-	//
-	// The assertion below pins the CURRENT behaviour so we have a regression
-	// test the day production is fixed; once the runner is updated to emit
-	// `source-not-found` (or the enum is expanded to `source-note-missing`),
-	// flip the expected value here as part of the fix commit.
+	// Fixed in T4.7: ExportRunner.run now performs an existence pre-check
+	// for note rules BEFORE invoking validateRuleAtRunTime, so the typed
+	// `source-not-found` errorCode is emitted reliably. Without the pre-check
+	// the scope validator's lstat would have thrown IoNotFoundError, escaping
+	// the runner uncaught and being converted by Scheduler.executeTick's
+	// catch-all into a generic `errorCode: "unknown"` rule-failed entry.
 	// -------------------------------------------------------------------------
 
 	describe("single-note export: missing source path → rule-failed", () => {
@@ -483,7 +475,7 @@ describe("export.live — vault-backed E2E", () => {
 			await tearDown(harness);
 		});
 
-		it("emits a single rule-failed audit entry and writes nothing (current behaviour: errorCode=unknown — see header)", async () => {
+		it("emits a single rule-failed audit entry with errorCode=source-not-found and writes nothing", async () => {
 			if (!harness) throw new Error("harness not initialized");
 			await runOnce(harness.plugin, rule.id);
 
@@ -506,12 +498,10 @@ describe("export.live — vault-backed E2E", () => {
 			const ruleEntry = entries[0];
 			expect(ruleEntry.direction).toBe("export");
 			expect(ruleEntry.decision).toBe("rule-failed");
-			// CURRENT behaviour: scope validation throws on the missing source
-			// before ExportRunner.enumerateNote runs, so the runner never gets
-			// to emit `source-not-found`; Scheduler's catch-all converts the
-			// throw into `errorCode: "unknown"`. See file-level header for the
-			// defect note (T4.7 follow-up).
-			expect(ruleEntry.errorCode).toBe("unknown");
+			// Fixed in T4.7: ExportRunner.run pre-checks note existence before
+			// scope validation, so the typed `source-not-found` errorCode flows
+			// through to the audit log instead of `unknown`.
+			expect(ruleEntry.errorCode).toBe("source-not-found");
 			expect(ruleEntry.ruleId).toBe(rule.id);
 			expect(ruleEntry.ruleName).toBe(rule.name);
 		});

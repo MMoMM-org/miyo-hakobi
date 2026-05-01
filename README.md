@@ -176,6 +176,12 @@ If you tried to save such a rule, you saw a validation error explaining which bo
 
 Per-device enable flags (`enabledOnThisDevice`) default to `false` on each newly-Synced device specifically to prevent this. Pick **one** device that should run each rule. See [Per-device enablement](#per-device-enablement).
 
+### "Export this note" silently does nothing
+
+The `Export this note` command is a **placeholder in v0.1** and currently no-ops. The full picker UX (a fuzzy-suggest list of configured export rules + active-note routing) is deferred to v0.2 (tracked in the spec README's Decisions Log entry dated 2026-05-01).
+
+Workaround for v0.1: configure a regular **export rule of `type: note`** pointing at the specific vault note you want exported. Run it from the **command palette** via `Run an export rule…` and pick the note rule, or simply let it fire on its `everyMinutes` schedule.
+
 ### "Why does my import rule keep picking up the same file twice?"
 
 If your import source folder is *itself* the destination of an Obsidian Sync replica from another device (e.g. you point Hakobi at `~/Library/Mobile Documents/iCloud~md~obsidian/Documents/Captures/` while another device is also Syncing into that folder), Hakobi can pick the file up before Sync has finished materializing it on this machine, or pick it up on multiple devices. The primary defence is the per-device `enabledOnThisDevice` flag — keep the import rule enabled on exactly one device. Prefer configuring import sources to point at local capture folders that Obsidian Sync does **not** write into.
