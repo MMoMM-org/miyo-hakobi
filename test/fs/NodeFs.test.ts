@@ -243,12 +243,11 @@ describe("NodeFs — timeout behaviour", () => {
     await expect(fs.mkdir("/p")).rejects.toBeInstanceOf(IoTimeoutError);
   });
 
-  it("cloud-sync placeholder simulation: a 500ms readFile is killed by a 50ms timeout", async () => {
+  it("cloud-sync placeholder simulation: a stalled readFile is killed by a 50ms timeout", async () => {
     // Models Dropbox / iCloud / OneDrive on-demand placeholders, where the OS
     // can stall the read for seconds while it materialises the file from cloud.
-    mocks.readFile.mockImplementationOnce(
-      () => new Promise<string>((resolve) => setTimeout(() => resolve("late"), 500)),
-    );
+    // models a stalled cloud-sync placeholder read via never-resolving Promise
+    mocks.readFile.mockImplementationOnce(() => never<string>());
     const fs = fixedTimeout(50);
     await expect(fs.readFile("/cloud/placeholder.txt")).rejects.toBeInstanceOf(IoTimeoutError);
   });
@@ -418,7 +417,7 @@ describe("NodeFs — no raw Error leaks", () => {
         return fs.realpath("/p");
       },
       () => {
-        mocks.mkdir.mockImplementationOnce(() => never<void>());
+        mocks.mkdir.mockRejectedValueOnce(errnoErr("EACCES"));
         return fs.mkdir("/p");
       },
     ];
