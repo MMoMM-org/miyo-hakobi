@@ -42,9 +42,13 @@ async function mkTmpDir(prefix: string): Promise<TmpDir> {
 	};
 }
 
-/** A tmp source directory the rule will read from. */
-export async function mkTmpSource(): Promise<TmpDir> {
-	return mkTmpDir("import-src");
+/**
+ * A tmp directory representing an external filesystem location. Used as an
+ * import source (rule reads from it) or an export destination (rule writes
+ * into it) — the generic name fits both directions for T4.3 reuse.
+ */
+export async function mkTmpExternalDir(): Promise<TmpDir> {
+	return mkTmpDir("external");
 }
 
 /** A tmp directory used as the Obsidian vault root. */

@@ -22,9 +22,10 @@ import { App } from "obsidian";
 
 import { makeNodeApp } from "./_helpers/makeNodeApp";
 import {
-	mkTmpSource,
+	mkTmpExternalDir,
 	mkTmpVault,
 	writeFileAt,
+	readFileAt,
 	fileExistsAt,
 	type TmpDir,
 } from "./_helpers/tmpDirs";
@@ -187,15 +188,24 @@ describe("import.live — vault-backed E2E", () => {
 		let harness: Harness | undefined;
 		let rule: ImportRule;
 
+		// Source contents — asserted both pre-run (sanity) and post-run (S2:
+		// guards against silent encoding/conversion bugs in the
+		// TextEncoder → ArrayBuffer → createBinary pipeline).
+		const SOURCE_CONTENTS: Record<string, string> = {
+			"note-a.md": "alpha\n",
+			"note-b.md": "beta\n",
+			"sub/note-c.md": "gamma\n",
+		};
+
 		beforeAll(async () => {
-			const source = await mkTmpSource();
+			const source = await mkTmpExternalDir();
 			const vault = await mkTmpVault();
 
 			// Backdate mtimes so files are "stable" against any stabilityCheckMs ≥ 0.
 			const oldMtime = Date.now() - 60_000;
-			await writeFileAt(source.path, "note-a.md", "alpha\n", oldMtime);
-			await writeFileAt(source.path, "note-b.md", "beta\n", oldMtime);
-			await writeFileAt(source.path, "sub/note-c.md", "gamma\n", oldMtime);
+			for (const [rel, content] of Object.entries(SOURCE_CONTENTS)) {
+				await writeFileAt(source.path, rel, content, oldMtime);
+			}
 
 			rule = makeRule({
 				id: "11111111-1111-4111-8111-111111111111",
@@ -212,17 +222,23 @@ describe("import.live — vault-backed E2E", () => {
 			await tearDown(harness);
 		});
 
-		it("copies all 3 files into the vault preserving subfolder structure", async () => {
+		it("imports 3 files preserving subfolder structure and emits matching audit entries", async () => {
 			if (!harness) throw new Error("harness not initialized");
 			await runOnce(harness.plugin, rule.id);
 
+			// ---- Vault state ----
 			expect(await fileExistsAt(harness.vault.path, "Inbox/note-a.md")).toBe(true);
 			expect(await fileExistsAt(harness.vault.path, "Inbox/note-b.md")).toBe(true);
 			expect(await fileExistsAt(harness.vault.path, "Inbox/sub/note-c.md")).toBe(true);
-		});
 
-		it("emits 3 file-level ok entries + 1 rule-level rule-ok entry", async () => {
-			if (!harness) throw new Error("harness not initialized");
+			// ---- File contents (S2): bytes round-trip through the
+			// TextEncoder → ArrayBuffer → createBinary pipeline unchanged.
+			for (const [rel, expected] of Object.entries(SOURCE_CONTENTS)) {
+				const landed = await readFileAt(harness.vault.path, `Inbox/${rel}`);
+				expect(landed).toBe(expected);
+			}
+
+			// ---- Audit NDJSON ----
 			const entries = await readAuditEntries(harness.auditDir);
 
 			const fileEntries = entries.filter((e) => e.decision === "ok");
@@ -261,7 +277,7 @@ describe("import.live — vault-backed E2E", () => {
 		let rule: ImportRule;
 
 		beforeAll(async () => {
-			const source = await mkTmpSource();
+			const source = await mkTmpExternalDir();
 			const vault = await mkTmpVault();
 
 			const oldMtime = Date.now() - 60_000;
@@ -285,19 +301,18 @@ describe("import.live — vault-backed E2E", () => {
 			await tearDown(harness);
 		});
 
-		it("rejects .DS_Store and lands the sanitized invalid-named file in the vault", async () => {
+		it("skips .DS_Store and sanitizes invalid name; audit entries match", async () => {
 			if (!harness) throw new Error("harness not initialized");
 			await runOnce(harness.plugin, rule.id);
 
+			// ---- Vault state ----
 			// .DS_Store must NOT appear in the vault.
 			expect(await fileExistsAt(harness.vault.path, "Inbox2/.DS_Store")).toBe(false);
 
 			// `bad:name.md` should land as `bad_name.md` (sanitization: `:` → `_`).
 			expect(await fileExistsAt(harness.vault.path, "Inbox2/bad_name.md")).toBe(true);
-		});
 
-		it("emits a housekeeping-file rejection and an ok copy entry, plus a rule-partial summary", async () => {
-			if (!harness) throw new Error("harness not initialized");
+			// ---- Audit NDJSON ----
 			const entries = await readAuditEntries(harness.auditDir);
 
 			// Housekeeping rejection — `.DS_Store` fails sanitizeFilename with

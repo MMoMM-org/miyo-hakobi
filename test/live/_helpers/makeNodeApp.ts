@@ -41,6 +41,34 @@ import { App, TFile, TFolder } from "obsidian";
 // ---------------------------------------------------------------------------
 
 /**
+ * Pure constructor for a TFile from a vault-relative path and an `fs.Stats`-
+ * shaped object. Centralized so sync (`getAbstractFileByPath`, `listAllFilesSync`)
+ * and async (`materializeFile`) call sites do not diverge on the field shape
+ * the rest of the test harness depends on. T4.3 (export E2E) reuses this.
+ */
+function buildTFile(
+	vrel: string,
+	name: string,
+	stat: { ctimeMs: number; mtimeMs: number; size: number },
+): TFile {
+	const dot = name.lastIndexOf(".");
+	const basename = dot > 0 ? name.slice(0, dot) : name;
+	const extension = dot > 0 ? name.slice(dot + 1) : "";
+
+	const tfile = new TFile();
+	tfile.path = vrel;
+	tfile.name = name;
+	tfile.basename = basename;
+	tfile.extension = extension;
+	tfile.stat = {
+		ctime: stat.ctimeMs,
+		mtime: stat.mtimeMs,
+		size: stat.size,
+	};
+	return tfile;
+}
+
+/**
  * Materialize a TFile instance whose `path`, `name`, `basename`, `extension`,
  * and `stat.mtime` reflect the on-disk file at `<vaultRoot>/<vrel>`. Returns
  * undefined if the path does not exist or is a directory.
@@ -59,21 +87,7 @@ async function materializeFile(
 	if (!stat.isFile()) return undefined;
 
 	const name = path.posix.basename(vrel);
-	const dot = name.lastIndexOf(".");
-	const basename = dot > 0 ? name.slice(0, dot) : name;
-	const extension = dot > 0 ? name.slice(dot + 1) : "";
-
-	const tfile = new TFile();
-	tfile.path = vrel;
-	tfile.name = name;
-	tfile.basename = basename;
-	tfile.extension = extension;
-	tfile.stat = {
-		ctime: stat.ctimeMs,
-		mtime: stat.mtimeMs,
-		size: stat.size,
-	};
-	return tfile;
+	return buildTFile(vrel, name, stat);
 }
 
 /**
@@ -198,17 +212,7 @@ export function makeNodeApp(vaultRoot: string): NodeApp {
 		if (kind === null) return null;
 		if (kind === "file") {
 			const s = fsSync.statSync(abs);
-			const name = path.posix.basename(vrel);
-			const dot = name.lastIndexOf(".");
-			const basename = dot > 0 ? name.slice(0, dot) : name;
-			const extension = dot > 0 ? name.slice(dot + 1) : "";
-			const tfile = new TFile();
-			tfile.path = vrel;
-			tfile.name = name;
-			tfile.basename = basename;
-			tfile.extension = extension;
-			tfile.stat = { ctime: s.ctimeMs, mtime: s.mtimeMs, size: s.size };
-			return tfile;
+			return buildTFile(vrel, path.posix.basename(vrel), s);
 		}
 		const tfolder = new TFolder();
 		tfolder.path = vrel;
@@ -270,16 +274,7 @@ export function makeNodeApp(vaultRoot: string): NodeApp {
 				} else if (e.isFile()) {
 					if (filterExt !== undefined && !e.name.endsWith(filterExt)) continue;
 					const s = fsSync.statSync(childAbs);
-					const dot = e.name.lastIndexOf(".");
-					const basename = dot > 0 ? e.name.slice(0, dot) : e.name;
-					const extension = dot > 0 ? e.name.slice(dot + 1) : "";
-					const tfile = new TFile();
-					tfile.path = childRel;
-					tfile.name = e.name;
-					tfile.basename = basename;
-					tfile.extension = extension;
-					tfile.stat = { ctime: s.ctimeMs, mtime: s.mtimeMs, size: s.size };
-					out.push(tfile);
+					out.push(buildTFile(childRel, e.name, s));
 				}
 			}
 		}
