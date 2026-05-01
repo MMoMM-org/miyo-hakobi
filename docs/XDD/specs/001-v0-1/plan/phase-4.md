@@ -1,6 +1,6 @@
 ---
 title: "Phase 4: Integration, E2E, Polish"
-status: in_progress
+status: completed
 version: "1.0"
 phase: 4
 ---
@@ -111,7 +111,7 @@ This phase glues the engine and UI into observably-correct behavior, hardens the
    - PRD/F2 wording reconciled to the canonical `source-not-found` ErrorCode (was `source-note-missing` in PRD draft); SDD acceptance criterion updated in step.
    - Compliance test: `test/spec/compliance.test.ts` (60 tests) — 7 sections covering registered commands, audit field allowlist, bundled files, register* discipline, F#→test mapping, ADR→impl mapping, and won't-have absences.
 
-- [ ] **T4.8 Phase 4 Validation & ship-ready check** `[activity: validate]`
+- [x] **T4.8 Phase 4 Validation & ship-ready check** `[activity: validate]`
 
   - Run the full pre-commit gate: `npm run typecheck && npm test && npm run lint && npm run build`.
   - Run `npm run test:live` (manually, requires Obsidian) — verify happy paths in the test vault.

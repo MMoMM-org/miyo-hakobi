@@ -1,6 +1,6 @@
 ---
 title: "Hakobi v0.1 — Implementation Plan"
-status: draft
+status: completed
 version: "1.0"
 ---
 
@@ -124,7 +124,7 @@ Each phase is in a separate file. Tasks follow red-green-refactor: **Prime** (un
 - [x] [Phase 1: Domain & Audit Primitives](phase-1.md)
 - [x] [Phase 2: Engine — Persistence, Scheduler, Runners](phase-2.md)
 - [x] [Phase 3: UI & Lifecycle Wiring](phase-3.md)
-- [ ] [Phase 4: Integration, E2E, Polish](phase-4.md)
+- [x] [Phase 4: Integration, E2E, Polish](phase-4.md)
 
 ---
 

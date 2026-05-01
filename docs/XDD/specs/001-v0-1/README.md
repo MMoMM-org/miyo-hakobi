@@ -5,8 +5,8 @@
 | Field | Value |
 |-------|-------|
 | **Created** | 2026-04-30 |
-| **Current Phase** | Ready |
-| **Last Updated** | 2026-04-30 |
+| **Current Phase** | Completed |
+| **Last Updated** | 2026-05-01 |
 
 ## Documents
 
@@ -52,6 +52,7 @@
 | 2026-05-01 | T4.7: PRD/F2 wording reconciled to ErrorCode enum — `source-note-missing` → `source-not-found` | The PRD draft used `source-note-missing` for the export-note "source missing" failure, but the SDD's closed `ErrorCode` union (single source of truth at `src/audit/AuditEntry.ts`) uses `source-not-found` as the canonical name for any missing-source failure (import or export). Two names for the same failure mode is a drift hazard. Resolution: update PRD/F2 acceptance criterion + SDD acceptance criterion to read `source-not-found`; production already uses the canonical name. No new ErrorCode variant added. |
 | 2026-05-01 | T4.7: Defect A fix — ExportRunner.run pre-checks note existence for `sourceType: note` rules before invoking `validateRuleAtRunTime` | `validateRuleAtRunTime` calls `fs.lstat` on the resolved source root, which threw `IoNotFoundError` for an export-note rule whose vault note no longer existed. The throw escaped `ExportRunner.run` uncaught, and `Scheduler.executeTick`'s catch-all converted it to `errorCode: "unknown"` — masking the typed `source-not-found` outcome PRD/F2 demands. The fix adds an `existence pre-check` (vaultIo.fileByPath) at the top of `ExportRunner.run` for note rules, so the typed errorCode flows through reliably. Folder/tag rules are unaffected (their roots tolerate emptiness; the scope validator does not throw for them). Live test (`test/live/export.live.test.ts`) updated to assert the corrected behaviour. |
 | 2026-05-01 | T4.7: Defect B deferred — `Export this note` command full picker UX deferred to v0.2 | The PRD/F7 acceptance criterion calls for a fuzzy-suggest list of export rules + active-note routing on the `Export this note` command. The current v0.1 implementation registers the command and correctly guards "no active note" via Notice, but builds a synthetic ad-hoc rule with an empty destination and a synthetic id; Scheduler.runOnce can't find the rule by id and the command silently no-ops. Rationale for deferral: the full picker UX requires Modal + suggester wiring beyond the v0.1 implementation budget, and the safer failure mode (silent no-op) is preferable to the riskier alternative (silently exporting via the wrong rule). User impact: the command appears in the palette but is currently a no-op. README troubleshooting section documents the limitation; users should configure an export rule of `type: note` for the specific note instead. Follow-up tracked as a Phase-5/v0.2 task. |
+| 2026-05-01 | T4.8: Phase 4 implementation complete; manifest bumped to v0.1.0; spec marked completed; ready for PR. | Final pre-commit gate green (749 unit tests / 36 files / typecheck / lint / build) and `npm run test:live` 5/5 against the tmp-vault harness. `manifest.json` version bumped 0.0.0 → 0.1.0 as a sanity check (semantic-release owns the canonical version in CI). Plan README + phase-4 frontmatter marked completed; T4.8 checkbox closed. v0.1 ship-ready. |
 
 ## Context
 
