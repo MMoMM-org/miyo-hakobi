@@ -4,7 +4,7 @@ _Last updated: 2026-05-01._
 
 ## TL;DR
 
-MiYo Hakobi is a local-first, zero-telemetry Obsidian community plugin. It ferries files between your Obsidian vault and user-configured local filesystem paths on a schedule. It has no network surface — no telemetry, no analytics, no crash reporting, no update pings, no inbound HTTP, no outbound HTTP. Your vault content stays on your machine. The only tracking Hakobi does is a local, metadata-only audit log that you can read, paginate, purge, and export from the plugin's settings tab.
+MiYo Hakobi is a local-first, zero-telemetry Obsidian community plugin. It ferries files between your Obsidian vault and user-configured local filesystem paths on a schedule. It has no network surface — no telemetry, no analytics, no crash reporting, no update pings, no inbound HTTP, no outbound HTTP. Your vault content stays on your machine. The only tracking Hakobi does is a local, metadata-only audit log that you can open, purge, and inspect from the plugin's settings tab.
 
 This document is the trust contract for v0.1 of the plugin. Every section addresses a specific Constitution L1 / L2 Privacy rule from the [MiYo Constitution](https://github.com/MMoMM-org/miyo-kokoro).
 
@@ -28,7 +28,7 @@ Hakobi stores three things on your local disk, all under your vault's plugin dat
 |---|---|---|
 | Rule definitions (import/export rule names, paths, schedules, copy/move mode, collision behavior, dry-run flag, etc.) | `<vault>/.obsidian/plugins/miyo-hakobi/data.json` | **Yes**, if you have Obsidian Sync enabled and configured to sync plugin data. |
 | Per-device flags (`enabledOnThisDevice` per rule, last-run timestamps, transient run state) | `<vault>/.obsidian/plugins/miyo-hakobi/device.json` | **No** — intentionally a sibling file outside `data.json` so each device decides for itself which rules run. Newly synced rules default to `enabledOnThisDevice: false` on every device. |
-| NDJSON audit log files | `<vault>/.obsidian/plugins/miyo-hakobi/audit/YYYY-MM.ndjson` (rotated monthly) | Depends on your Obsidian Sync configuration. The audit log is metadata-only by design (see below); we recommend excluding the `audit/` directory from Sync if you do not want diagnostic logs replicated across devices. |
+| NDJSON audit log files | `<vault>/.obsidian/plugins/miyo-hakobi/audit/YYYY-MM.ndjson` (rotated monthly) | **No** — audit files are sibling files in the plugin data directory, accessed via the adapter path API (`app.vault.adapter.getFullPath()`) rather than via Obsidian Sync's `loadData`/`saveData` channel. Obsidian Sync does not replicate them. |
 
 Defaults for the audit log: rotate monthly, cap each file at **10 MB**, retain for **90 days**. You can change these in Settings → General. A "Purge audit log" button is available in the same tab.
 
@@ -55,14 +55,12 @@ Audit log entries are constrained to a closed allowlist of fields. The plugin wi
 - `ruleName` — user-chosen name of the rule (e.g. `"Voice memos to Inbox"`).
 - `direction` — `import` or `export`.
 - `operation` — one of `copy`, `move`, `skip`, `suffix`, `rejected`, `error`, `would-write`, `would-skip`, `would-suffix`, `skipped`.
-- `decision` — short summary of why this operation was chosen (e.g. `"new file"`, `"collision-skip"`, `"sanitization-rejected"`).
+- `decision` — closed enum classifying the outcome. Per-file values: `ok`, `skipped`, `rejected`, `error`, `would-write`, `would-skip`, `would-suffix`. Rule-level summary values: `rule-ok`, `rule-failed`, `rule-partial`. Plus the `purged-by-user` sentinel written once after the user confirms "Purge audit log".
 - `sourcePathRelative` — path **relative to the rule's source root**. Never absolute, never includes home-directory components.
 - `destinationPathRelative` — path **relative to the rule's destination root**. Never absolute.
 - `errorCode` — closed enum value (e.g. `source-not-found`, `symlink-refused`, `loop-refused`, `io-timeout`). Never a raw exception string, never a stack trace.
 - `bytesTransferred` — integer byte count. Never the bytes themselves.
 - `durationMs` — wall-clock duration of the operation.
-- `fileCount` — number of files processed in a rule-run summary entry.
-- `success` — boolean for rule-run summary entries.
 
 **The audit log NEVER contains:**
 
@@ -155,4 +153,4 @@ Privacy-relevant bug reports: open an issue at the tracker above, or email `marc
 
 ## Changes to this policy
 
-Any changes to this policy will be announced in the release notes and in `CHANGELOG.md`. The git history of this file is the canonical record of past versions.
+Any changes to this policy will be announced in the release notes and reflected in the git history of this file.
