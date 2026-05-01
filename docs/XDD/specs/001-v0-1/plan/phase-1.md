@@ -73,7 +73,7 @@ This phase delivers the pure, Obsidian-free foundation: types, sanitize, scope, 
      - [ ] All Rule variants round-trip JSON cleanly `[ref: SDD/Data Storage Changes]`
      - [ ] Validator surfaces the union of errors, not just the first one `[ref: SDD/ADR-2]`
 
-- [ ] **T1.5 Path safety helpers** `[activity: domain-modeling] [parallel: true]`
+- [x] **T1.5 Path safety helpers** `[activity: domain-modeling] [parallel: true]`
 
   1. Prime: `[ref: SDD/ADR-5]`, `[ref: SDD/OS Filesystem Boundary]` (in PRD-time integration research as informed the SDD).
   2. Test: `~` / `$HOME` / `%USERPROFILE%` expansion; persists resolved absolute path; rejects path with NUL byte; rejects unbounded length; normalizes `\` → `/` and collapses duplicate `/`.
