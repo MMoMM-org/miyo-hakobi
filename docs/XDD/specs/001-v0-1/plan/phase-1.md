@@ -1,6 +1,6 @@
 ---
 title: "Phase 1: Domain & Audit Primitives"
-status: pending
+status: in_progress
 version: "1.0"
 phase: 1
 ---
@@ -34,7 +34,7 @@ phase: 1
 
 This phase delivers the pure, Obsidian-free foundation: types, sanitize, scope, atomic-write helper, NDJSON audit log + rotation, and the FS / Vault adapter wrappers. Most tasks are mutually independent and can run in parallel; the few that compose other Phase-1 modules are sequenced after them.
 
-- [ ] **T1.1 Filename sanitization** `[activity: domain-modeling] [parallel: true]`
+- [x] **T1.1 Filename sanitization** `[activity: domain-modeling] [parallel: true]`
 
   1. Prime: Read sanitize reference impl `[ref: SDD/Implementation Examples; sanitize.ts]` and PRD criterion `[ref: PRD/F4]`.
   2. Test: NUL byte rejection; `..` / path-separator stripping; OS housekeeping allowlist (`.DS_Store`, `Thumbs.db`, `desktop.ini`, `.localized`, `.AppleDouble`, `$RECYCLE.BIN`, `System Volume Information`); control-char stripping; Obsidian-invalid char replacement (`* " \ / < > : | ?` → `_`); leading/trailing dot+space trim; Windows-reserved name suffixing (`CON`, `PRN`, `AUX`, `NUL`, `COM1`–`COM9`, `LPT1`–`LPT9`); empty-after-sanitize rejection; UTF-8 byte-length cap (255 segment / 1024 total). Each rule has at least one accept and one reject case (Constitution L1 Testing).
@@ -54,7 +54,7 @@ This phase delivers the pure, Obsidian-free foundation: types, sanitize, scope, 
      - [ ] All default-deny acceptance criteria covered by tests `[ref: PRD/F9]`
      - [ ] Scope decisions are deterministic given (path, vaultRoot, pluginDir) `[ref: SDD/ADR-1]`
 
-- [ ] **T1.3 Rule ID generation** `[activity: domain-modeling] [parallel: true]`
+- [x] **T1.3 Rule ID generation** `[activity: domain-modeling] [parallel: true]`
 
   1. Prime: `[ref: SDD/ADR-7]`.
   2. Test: returns a valid UUID v4 string; two consecutive calls return different IDs.
@@ -63,7 +63,7 @@ This phase delivers the pure, Obsidian-free foundation: types, sanitize, scope, 
   5. Success:
      - [ ] `RuleId` is a branded type so accidental string→RuleId assignment fails at compile time `[ref: SDD/ADR-2]`
 
-- [ ] **T1.4 Rule schema (types + validators)** `[activity: domain-modeling]`
+- [x] **T1.4 Rule schema (types + validators)** `[activity: domain-modeling]`
 
   1. Prime: `[ref: SDD/Application Data Models]` (entire section), `[ref: PRD/F1, F2, F8]`.
   2. Test: each `Rule` variant accepts a valid example; required-field omission fails validation; `everyMinutes < 1` rejected; tags must start with `#`; `flattenOnTarget` defaults to `false` if absent (post-migration); `dryRun` defaults to `false` if absent.
