@@ -179,6 +179,11 @@ export class RuleStore {
 	async loadGlobalSettings(): Promise<GlobalSettings> {
 		const raw = await this.adapter.loadData();
 		const { data } = this._normalizeAndMigrate(raw);
+		// Also sync _rules so that a subsequent _persist() call (e.g. via
+		// saveGlobalSettings) writes the already-persisted rules rather than the
+		// constructor-default empty array — which would silently wipe all rules.
+		const { rules } = this._validateRules(data.rules);
+		this._rules = rules;
 		const settings = this._mergeSettings(data.globalSettings);
 		this._globalSettings = settings;
 		return settings;

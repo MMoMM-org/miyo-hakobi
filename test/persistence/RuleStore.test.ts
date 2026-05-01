@@ -463,6 +463,52 @@ describe("RuleStore.saveGlobalSettings()", () => {
 		expect(saved.globalSettings).toEqual(newSettings);
 		expect(saved.rules).toHaveLength(1);
 	});
+
+	it("preserves existing rules when only loadGlobalSettings() was called before saving (Finding 1 regression)", async () => {
+		// Pre-seed the adapter with a document containing several rules and custom settings.
+		const r1 = makeImportRule({ id: "r1" as ImportRule["id"], name: "Rule One" });
+		const r2 = makeImportRule({ id: "r2" as ImportRule["id"], name: "Rule Two" });
+		const originalSettings: GlobalSettings = {
+			perFileTimeoutMs: 5000,
+			auditRetentionDays: 30,
+			auditMaxBytes: 1048576,
+			stabilityCheckMs: 500,
+		};
+		const adapter = makeFakeAdapter({
+			schemaVersion: 1,
+			rules: [r1, r2],
+			globalSettings: originalSettings,
+		});
+
+		// Construct a FRESH RuleStore — _rules starts as [].
+		const store = new RuleStore(adapter);
+
+		// Call loadGlobalSettings() ONLY — never call load().
+		await store.loadGlobalSettings();
+
+		// Now save new settings; _persist() must write the already-persisted rules,
+		// NOT the default empty array from the constructor.
+		const newSettings: GlobalSettings = {
+			perFileTimeoutMs: 9000,
+			auditRetentionDays: 60,
+			auditMaxBytes: 2097152,
+			stabilityCheckMs: 1000,
+		};
+		await store.saveGlobalSettings(newSettings);
+
+		const persisted = adapter._getStored() as {
+			rules: Rule[];
+			globalSettings: GlobalSettings;
+		};
+
+		// Both original rules must survive — the bug silently wiped them.
+		expect(persisted.rules).toHaveLength(2);
+		expect(persisted.rules[0]!.id).toBe("r1");
+		expect(persisted.rules[1]!.id).toBe("r2");
+
+		// And the new settings must be applied.
+		expect(persisted.globalSettings).toEqual(newSettings);
+	});
 });
 
 // ---------------------------------------------------------------------------
