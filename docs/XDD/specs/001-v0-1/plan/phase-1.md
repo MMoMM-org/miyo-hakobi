@@ -101,15 +101,15 @@ This phase delivers the pure, Obsidian-free foundation: types, sanitize, scope, 
      - [ ] All FS operations are time-bounded `[ref: PRD/F11]`
      - [ ] Errors are typed with closed error codes (no raw `Error` objects leak) `[ref: PRD/F5]`
 
-- [ ] **T1.8 VaultIo adapter** `[activity: data-architecture] [parallel: true]`
+- [x] **T1.8 VaultIo adapter** `[activity: data-architecture] [parallel: true]`
 
   1. Prime: `[ref: SDD/Obsidian API Touchpoints]`, mock surface in `test/__mocks__/obsidian.ts`.
   2. Test: `readBinary(path)`, `writeBinary(path, bytes)`, `existsAtVaultPath(path)`, `listFolder(path, { recursive })`, `notesByTag(tags, match)` (uses `getAllTags` + `metadataCache.getFileCache`), `getActiveFile()`, `ensureFolder(path)`. Each method is asserted to use the Vault API (mock spies confirm `app.vault.create` / `read` / `getMarkdownFiles` are called).
   3. Implement: `src/vault/VaultIo.ts` — class wrapping `app.vault` + `app.metadataCache` + `app.workspace`. Owns all in-vault I/O.
   4. Validate: lint + typecheck.
   5. Success:
-     - [ ] No raw `fs` import anywhere in `VaultIo.ts` `[ref: SDD/Solution Strategy]`
-     - [ ] Tag-rule recursion (nested tags) implemented per ADR-11 `[ref: SDD/ADR-11]`
+     - [x] No raw `fs` import anywhere in `VaultIo.ts` `[ref: SDD/Solution Strategy]`
+     - [x] Tag-rule recursion (nested tags) implemented per ADR-11 `[ref: SDD/ADR-11]`
 
 - [ ] **T1.9 Atomic writer** `[activity: data-architecture]`
 
