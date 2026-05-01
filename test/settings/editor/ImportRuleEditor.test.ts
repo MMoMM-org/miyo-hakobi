@@ -392,6 +392,46 @@ describe("ImportRuleEditor", () => {
 	});
 
 	// -----------------------------------------------------------------------
+	// T3.6.11 — validateRule failures: Save disabled AND inline error shown
+	// -----------------------------------------------------------------------
+
+	it("shows inline field error in errorDiv when validateRule rejects (empty name)", async () => {
+		editor.renderForCreate(container, vi.fn());
+
+		// Fill all fields valid except name (leave empty — triggers validateRule failure)
+		const srcInput = container.querySelector<HTMLInputElement>(
+			'input[data-field="sourcePath"]',
+		)!;
+		srcInput.value = "/users/m/voice";
+		srcInput.dispatchEvent(new Event("input"));
+
+		const destInput = container.querySelector<HTMLInputElement>(
+			'input[data-field="destinationVaultPath"]',
+		)!;
+		destInput.value = "Inbox/voice";
+		destInput.dispatchEvent(new Event("input"));
+
+		const everyInput = container.querySelector<HTMLInputElement>(
+			'input[data-field="everyMinutes"]',
+		)!;
+		everyInput.value = "5";
+		everyInput.dispatchEvent(new Event("input"));
+
+		// Name is left empty — validateRule should reject with a "name" error
+
+		const saveBtn = container.querySelector<HTMLButtonElement>(
+			'button[data-action="save"]',
+		)!;
+		expect(saveBtn.disabled).toBe(true);
+
+		const errorEl = container.querySelector<HTMLElement>('[data-role="scope-error"]')!;
+		// The errorDiv must NOT be empty — it must show the validateRule error
+		expect(errorEl.textContent).toBeTruthy();
+		// The error message must reference the "name" field
+		expect(errorEl.textContent).toMatch(/name/i);
+	});
+
+	// -----------------------------------------------------------------------
 	// T3.6.10 — Edit-mode Save: update called, NOT add; markCreatedHere NOT called
 	// -----------------------------------------------------------------------
 

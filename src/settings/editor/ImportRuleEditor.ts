@@ -181,7 +181,10 @@ export class ImportRuleEditor {
 
 			if (!ruleResult.ok) {
 				if (saveBtn) saveBtn.disabled = true;
-				errorDiv.textContent = "";
+				const firstError = ruleResult.errors[0];
+				errorDiv.textContent = firstError
+					? `${firstError.path}: ${firstError.message}`
+					: "Rule is invalid";
 				return;
 			}
 
