@@ -49,7 +49,7 @@ function renderFundingLinks(
 	parentEl: HTMLElement,
 	fundingUrl: string | Record<string, string> | undefined,
 ): void {
-	if (fundingUrl === undefined || fundingUrl === null) return;
+	if (fundingUrl === undefined) return;
 
 	const createLink = (href: string, label: string): void => {
 		const any = parentEl as unknown as Record<string, unknown>;
@@ -143,10 +143,14 @@ export class HeaderSection {
 		// Meta line: author | repo | funding
 		const meta = headerCreateEl("p", { cls: "hakobi-meta" });
 
-		// Author link
+		// Author link — only render an anchor if authorUrl is present; otherwise plain text
 		const authorName = parseAuthorDisplayName(manifest.author ?? "");
 		appendText(meta, "Author: ");
-		appendLink(meta, manifest.authorUrl ?? "", authorName);
+		if (manifest.authorUrl !== undefined) {
+			appendLink(meta, manifest.authorUrl, authorName);
+		} else {
+			appendText(meta, authorName);
+		}
 
 		// Repo link
 		appendText(meta, " | Repo: ");

@@ -201,4 +201,25 @@ describe("HeaderSection", () => {
 			expect(anchor.getAttribute("href")).toBeTruthy();
 		}
 	});
+
+	it("renders author name as plain text (no anchor) when authorUrl is absent", () => {
+		const { authorUrl: _dropped, ...manifestWithoutAuthorUrl } = BASE_MANIFEST;
+		void _dropped;
+		const section = new HeaderSection({
+			plugin: { manifest: manifestWithoutAuthorUrl },
+			containerEl,
+		});
+		section.render();
+		// Author display name must still appear somewhere in the output
+		expect(containerEl.textContent).toContain("Marcus Breiden");
+		// There must be NO anchor element with an empty href (broken anchor)
+		const anchors = Array.from(containerEl.querySelectorAll("a"));
+		const brokenAnchor = anchors.find((a) => a.getAttribute("href") === "");
+		expect(brokenAnchor).toBeUndefined();
+		// And no anchor whose href resolves to the author (none expected at all)
+		const authorAnchor = anchors.find((a) =>
+			a.textContent?.includes("Marcus Breiden"),
+		);
+		expect(authorAnchor).toBeUndefined();
+	});
 });
