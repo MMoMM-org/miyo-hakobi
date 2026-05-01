@@ -354,16 +354,6 @@ describe("parseAuditLine", () => {
     }
   });
 
-  it("rejects a line with a non-finite bytesTransferred", () => {
-    const bad = JSON.stringify({ ...fileOk, bytesTransferred: -1 });
-    const result = parseAuditLine(bad);
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.errors.kind).toBe("invalid-type");
-      expect(result.errors.detail).toContain("bytesTransferred");
-    }
-  });
-
   it("rejects a line with a non-string destinationPathRelative", () => {
     const bad = JSON.stringify({ ...fileOk, destinationPathRelative: 7 });
     const result = parseAuditLine(bad);

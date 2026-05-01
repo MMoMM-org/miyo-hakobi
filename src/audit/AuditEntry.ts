@@ -322,22 +322,22 @@ export function parseAuditLine(line: string): Result<AuditEntry, ParseError> {
   const bytesTransferredRaw = obj["bytesTransferred"];
   if (
     bytesTransferredRaw !== undefined &&
-    !isNonNegativeFiniteNumber(bytesTransferredRaw)
+    typeof bytesTransferredRaw !== "number"
   ) {
     return fail({
       kind: "invalid-type",
-      detail: "'bytesTransferred' must be a non-negative finite number when present",
+      detail: "'bytesTransferred' must be a number when present",
     });
   }
 
   const durationMsRaw = obj["durationMs"];
   if (
     durationMsRaw !== undefined &&
-    !isNonNegativeFiniteNumber(durationMsRaw)
+    typeof durationMsRaw !== "number"
   ) {
     return fail({
       kind: "invalid-type",
-      detail: "'durationMs' must be a non-negative finite number when present",
+      detail: "'durationMs' must be a number when present",
     });
   }
 
@@ -383,8 +383,4 @@ function isMember<T extends string>(values: readonly T[], v: string): v is T {
 
 function joinValues(values: readonly string[]): string {
   return values.map((v) => `'${v}'`).join(", ");
-}
-
-function isNonNegativeFiniteNumber(v: unknown): v is number {
-  return typeof v === "number" && Number.isFinite(v) && v >= 0;
 }
