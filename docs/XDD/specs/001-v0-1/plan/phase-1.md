@@ -82,7 +82,7 @@ This phase delivers the pure, Obsidian-free foundation: types, sanitize, scope, 
   5. Success:
      - [ ] Path expansion is deterministic given env vars `[ref: SDD/ADR-5]`
 
-- [ ] **T1.6 Audit entry types** `[activity: domain-modeling] [parallel: true]`
+- [x] **T1.6 Audit entry types** `[activity: domain-modeling] [parallel: true]`
 
   1. Prime: `[ref: SDD/Application Data Models; AuditEntry]`, `[ref: PRD/F5]`.
   2. Test: TypeScript-level — only allowed fields present (assert with `Exact<>` helper); `serializeAuditEntry(entry)` produces single-line JSON without trailing newline; `parseAuditLine(line)` returns `Result<AuditEntry, ParseError>`; round-trip preserves all fields; rejects lines with unknown fields (defensive).
