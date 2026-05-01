@@ -1,6 +1,6 @@
 ---
 title: "Phase 3: UI & Lifecycle Wiring"
-status: in_progress
+status: completed
 version: "1.0"
 phase: 3
 ---
@@ -158,7 +158,7 @@ This phase delivers all user-visible surfaces and the `main.ts` lifecycle wiring
      - [x] Lifecycle clean (no leaks) `[ref: SDD/Quality Requirements/Reliability]`
      - [x] All wiring follows downward-only dependency direction `[ref: SDD/ADR-1]`
 
-- [ ] **T3.12 Phase 3 Validation** `[activity: validate]`
+- [x] **T3.12 Phase 3 Validation** `[activity: validate]`
 
   - Run `npm run typecheck && npm test && npm run lint && npm run build`.
   - Bundle size check: `ls -la build/main.js` ≤ 100 KB.
