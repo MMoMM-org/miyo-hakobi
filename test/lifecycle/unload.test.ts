@@ -95,14 +95,15 @@ describe("HakobiPlugin lifecycle", () => {
       // This proves the post-onload "timers are registered" invariant
       // (phase-4.md T4.1.2 spec) without depending on real Scheduler internals.
       const { Scheduler } = await import("../../src/scheduler/Scheduler");
-      let plugin: InstanceType<typeof Plugin>;
+      let plugin: InstanceType<typeof Plugin> | undefined;
       const startSpy = vi
         .spyOn(Scheduler.prototype, "start")
         .mockImplementation(async () => {
+          // Called only after `await plugin.onload()` — plugin is guaranteed assigned.
           // Register a heartbeat interval through the Plugin contract so the
           // mock's _cleanupFns gets a clearInterval entry — mirrors what the
           // real Scheduler.start() does for each rule's everyMinutes timer.
-          plugin.registerInterval(
+          plugin!.registerInterval(
             setInterval(() => {}, 60_000) as unknown as number,
           );
         });
@@ -113,6 +114,7 @@ describe("HakobiPlugin lifecycle", () => {
       vi.useFakeTimers();
 
       plugin = await makePlugin();
+      if (!plugin) throw new Error("makePlugin() returned undefined");
 
       // ---------------------------------------------------------------------
       // CYCLE 1
@@ -164,8 +166,13 @@ describe("HakobiPlugin lifecycle", () => {
       // _runCleanup() to do this synchronously.
       (plugin as unknown as { _runCleanup(): void })._runCleanup();
 
-      // Drain any timers that may have been queued during cleanup (none expected)
-      await vi.runAllTimersAsync();
+      // Drain any 0ms timers/microtasks a future cleanup might enqueue. We use
+      // advanceTimersByTimeAsync(0) instead of runAllTimersAsync because the
+      // Scheduler.start mock above registers a perpetual heartbeat interval —
+      // runAllTimersAsync would chase that interval forever if a future cleanup
+      // accidentally left it un-cleared. advanceTimersByTimeAsync(0) is the
+      // safe drain primitive: flushes ready work without recursing.
+      await vi.advanceTimersByTimeAsync(0);
 
       // Assertions: zero residual state after cycle 1
       expect((plugin as unknown as { _cleanupFns: unknown[] })._cleanupFns).toHaveLength(0);
@@ -223,7 +230,11 @@ describe("HakobiPlugin lifecycle", () => {
       expect(stopSpy).toHaveBeenCalledTimes(2);
 
       (plugin as unknown as { _runCleanup(): void })._runCleanup();
-      await vi.runAllTimersAsync();
+      // Same reasoning as cycle 1: advanceTimersByTimeAsync(0) drains ready
+      // work without chasing the perpetual heartbeat interval that the
+      // Scheduler.start mock registers — runAllTimersAsync would loop forever
+      // if a future cleanup ever left the heartbeat un-cleared.
+      await vi.advanceTimersByTimeAsync(0);
 
       // Final assertions: zero residual state after cycle 2 (no leaks across
       // reloads — the canonical SDD/Reliability invariant).
