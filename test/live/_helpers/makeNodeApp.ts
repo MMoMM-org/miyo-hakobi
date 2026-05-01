@@ -36,6 +36,12 @@
 // tag-rule tests see real, fixture-driven tags for selected vault files.
 // Without fixtures the original null-returning behaviour is preserved (import
 // E2E tests do not exercise tag matching).
+//
+// Mock-bleed protection: the override of the module-level `getAllTags` mock
+// would survive into sibling describes within the same test file. To prevent
+// that, `makeNodeApp` returns a `teardown()` callback that restores the
+// original null-returning implementations. Test files invoke it from
+// `afterAll`. Calling it is a no-op when no fixtures were supplied.
 
 import * as fs from "node:fs/promises";
 import * as fsSync from "node:fs";
@@ -192,6 +198,14 @@ function buildTFolderWithChildrenSync(
 export interface NodeApp {
 	app: App;
 	vaultRoot: string;
+	/**
+	 * Restore any module-level mocks that `makeNodeApp` overrode (currently the
+	 * `getAllTags` mock when `tagFixtures` was supplied, plus the per-instance
+	 * `metadataCache.getFileCache`). Safe to call unconditionally — when no
+	 * fixtures were passed, this is a no-op. Test files should invoke it from
+	 * `afterAll` to prevent mock bleed across describe blocks.
+	 */
+	teardown: () => void;
 }
 
 /**
@@ -392,27 +406,34 @@ export function makeNodeApp(
 	// extract those same tags from the cache (mirroring real Obsidian behaviour
 	// of `cache.tags?.map(t => t.tag)`).
 	const tagFixtures = opts.tagFixtures;
+	let teardown: () => void = () => undefined;
 	if (tagFixtures !== undefined) {
 		const metadataCache = app.metadataCache as unknown as Record<string, unknown>;
 		metadataCache["getFileCache"] = vi.fn((file: TFile): CachedMetadata | null => {
 			const tags = tagFixtures.get(file.path);
 			if (tags === undefined) return null;
-			const tagCaches: TagCache[] = tags.map((tag) => ({ tag }));
+			const tagCaches = tags.map((tag) => ({ tag }));
 			return { tags: tagCaches };
 		});
 
 		// getAllTags is a module-level vi.fn in the obsidian mock. Override its
-		// implementation so VaultIo.notesByTag sees the fixture tags. We do not
-		// reset it on teardown — each test that wants tag matching supplies its
-		// own fixtures via a fresh makeNodeApp() call, and the obsidian module
-		// mock is per-test-file scoped enough for our usage.
+		// implementation so VaultIo.notesByTag sees the fixture tags, then expose
+		// a teardown that restores the original null-returning default so the
+		// override does not bleed into sibling describe blocks in the same file.
 		vi.mocked(getAllTags).mockImplementation((cache): string[] | null => {
 			if (cache === null || cache === undefined) return null;
 			const tags = cache.tags;
 			if (tags === undefined || tags.length === 0) return null;
 			return tags.map((t: TagCache) => t.tag);
 		});
+		teardown = (): void => {
+			vi.mocked(getAllTags).mockImplementation(
+				(_cache: CachedMetadata): string[] | null => null,
+			);
+			// `app` is the per-call instance, so its metadataCache override dies
+			// with it; nothing else to restore there.
+		};
 	}
 
-	return { app, vaultRoot };
+	return { app, vaultRoot, teardown };
 }

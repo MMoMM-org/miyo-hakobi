@@ -49,6 +49,7 @@ interface Harness {
 	source: TmpDir;
 	vault: TmpDir;
 	auditDir: string;
+	teardown: () => void;
 }
 
 /**
@@ -68,7 +69,7 @@ async function makeHarness(opts: {
 		recursive: true,
 	});
 
-	const { app } = makeNodeApp(opts.vault.path);
+	const { app, teardown } = makeNodeApp(opts.vault.path);
 
 	const { default: HakobiPlugin } = await import("../../src/main");
 	const plugin = new HakobiPlugin(app as App);
@@ -103,6 +104,7 @@ async function makeHarness(opts: {
 		source: opts.source,
 		vault: opts.vault,
 		auditDir: path.join(opts.vault.path, PLUGIN_DATA_DIR_REL, "audit"),
+		teardown,
 	};
 }
 
@@ -113,6 +115,11 @@ async function tearDown(h: Harness | undefined): Promise<void> {
 		h.plugin.onunload();
 	} catch {
 		// best-effort
+	}
+	try {
+		h.teardown();
+	} catch {
+		// best-effort — restoring module-level mocks must not mask test errors.
 	}
 	await h.source.cleanup().catch(() => undefined);
 	await h.vault.cleanup().catch(() => undefined);
