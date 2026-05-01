@@ -90,18 +90,29 @@ describe("HakobiPlugin lifecycle", () => {
     "two consecutive load/unload cycles leave no active timers and no orphaned cleanups",
     async () => {
       // Stub Scheduler.start so onload finishes without scheduling real timers
-      // for any rules. (start() is async and awaited in onload.)
+      // for any rules — but simulate the scheduler's actual contract by
+      // registering at least one interval via plugin.registerInterval(...).
+      // This proves the post-onload "timers are registered" invariant
+      // (phase-4.md T4.1.2 spec) without depending on real Scheduler internals.
       const { Scheduler } = await import("../../src/scheduler/Scheduler");
+      let plugin: InstanceType<typeof Plugin>;
       const startSpy = vi
         .spyOn(Scheduler.prototype, "start")
-        .mockResolvedValue(undefined);
+        .mockImplementation(async () => {
+          // Register a heartbeat interval through the Plugin contract so the
+          // mock's _cleanupFns gets a clearInterval entry — mirrors what the
+          // real Scheduler.start() does for each rule's everyMinutes timer.
+          plugin.registerInterval(
+            setInterval(() => {}, 60_000) as unknown as number,
+          );
+        });
       const stopSpy = vi
         .spyOn(Scheduler.prototype, "stop")
         .mockImplementation(() => {});
 
       vi.useFakeTimers();
 
-      const plugin = await makePlugin();
+      plugin = await makePlugin();
 
       // ---------------------------------------------------------------------
       // CYCLE 1
@@ -116,22 +127,21 @@ describe("HakobiPlugin lifecycle", () => {
       await plugin.onload();
 
       // Drain best-effort rotation.checkAndRotate() that onload fires-and-forgets.
-      await vi.runAllTimersAsync();
+      // Use advanceTimersByTimeAsync(0) instead of runAllTimersAsync so the
+      // perpetual heartbeat interval registered by Scheduler.start() does not
+      // loop forever — we only need queued microtasks/0ms timers to flush.
+      await vi.advanceTimersByTimeAsync(0);
 
       // Scheduler is running: start() called exactly once on cycle 1
       expect(startSpy).toHaveBeenCalledTimes(1);
 
-      // Cleanup registry is non-empty — registerInterval and/or register pushed
-      // entries during onload (e.g., the per-rule timers via Scheduler, or
-      // future register*-based subscriptions). If this ever drops to 0,
-      // either the wiring regressed or HakobiPlugin no longer registers any
-      // cleanup; either way, this is the canary.
-      // NOTE: With Scheduler.start() stubbed, no rule timers are registered;
-      // the production code currently has no other register*() calls in
-      // onload(). So we only assert _cleanupFns is an array (sanity), not
-      // that it is non-empty — leaving room for future register* additions
-      // without forcing this test to chase them.
-      expect(Array.isArray((plugin as unknown as { _cleanupFns: unknown[] })._cleanupFns)).toBe(true);
+      // Cleanup registry is non-empty AND a fake timer is active — proves
+      // "timers are registered" (phase-4.md T4.1.2). The Scheduler.start mock
+      // simulates the real contract by enqueuing one registerInterval call.
+      expect(
+        (plugin as unknown as { _cleanupFns: unknown[] })._cleanupFns.length,
+      ).toBeGreaterThan(0);
+      expect(vi.getTimerCount()).toBeGreaterThan(0);
 
       // Obsidian surface registrations happened
       const addCommandDelta1 =
@@ -161,6 +171,14 @@ describe("HakobiPlugin lifecycle", () => {
       expect((plugin as unknown as { _cleanupFns: unknown[] })._cleanupFns).toHaveLength(0);
       expect(vi.getTimerCount()).toBe(0);
 
+      // "all DOM listeners removed" (phase-4.md T4.1.2). Production code does
+      // not currently register DOM events; this assertion locks the surface so
+      // a future addition either gets a corresponding cleanup test OR is
+      // explicitly waived.
+      expect(
+        (plugin.registerDomEvent as ReturnType<typeof vi.fn>).mock.calls.length,
+      ).toBe(0);
+
       // ---------------------------------------------------------------------
       // CYCLE 2 — re-load the same plugin instance and unload again.
       // This catches state that survives onunload (e.g. members on `this`
@@ -173,10 +191,19 @@ describe("HakobiPlugin lifecycle", () => {
       const beforeCycle2AddStatusBarItemCalls = (plugin.addStatusBarItem as ReturnType<typeof vi.fn>).mock.calls.length;
 
       await plugin.onload();
-      await vi.runAllTimersAsync();
+      // Same reasoning as cycle 1 — flush microtasks/0ms timers without
+      // looping the perpetual heartbeat interval registered by start().
+      await vi.advanceTimersByTimeAsync(0);
 
       // Scheduler.start() was called again — total now 2
       expect(startSpy).toHaveBeenCalledTimes(2);
+
+      // Same "timers are registered" invariant as cycle 1 — proves the
+      // re-load wired the scheduler back in (no leak across reloads).
+      expect(
+        (plugin as unknown as { _cleanupFns: unknown[] })._cleanupFns.length,
+      ).toBeGreaterThan(0);
+      expect(vi.getTimerCount()).toBeGreaterThan(0);
 
       // Same delta as cycle 1: 7 commands, 1 settings tab, 1 status bar item.
       // (If onload were leaving stale state behind, we might see >7 commands
@@ -202,6 +229,14 @@ describe("HakobiPlugin lifecycle", () => {
       // reloads — the canonical SDD/Reliability invariant).
       expect((plugin as unknown as { _cleanupFns: unknown[] })._cleanupFns).toHaveLength(0);
       expect(vi.getTimerCount()).toBe(0);
+
+      // "all DOM listeners removed" (phase-4.md T4.1.2). Production code does
+      // not currently register DOM events; this assertion locks the surface so
+      // a future addition either gets a corresponding cleanup test OR is
+      // explicitly waived.
+      expect(
+        (plugin.registerDomEvent as ReturnType<typeof vi.fn>).mock.calls.length,
+      ).toBe(0);
     },
   );
 });
