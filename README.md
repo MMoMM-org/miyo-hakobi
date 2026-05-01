@@ -100,13 +100,13 @@ Same shape as Import. Source-type can be **folder** (vault subtree, recursive), 
 
 Hakobi registers exactly seven commands. Obsidian auto-prefixes commands with the plugin name in the command palette, so they appear as `Hakobi: …`.
 
-- `Run import (all rules)`
-- `Run import (select rule)`
-- `Run export (all rules)`
-- `Run export (select rule)`
+- `Run all import rules`
+- `Run an import rule…`
+- `Run all export rules`
+- `Run an export rule…`
 - `Export this note` — pick from the configured export rules and ferry the active note via that rule's destination + collision policy. If no note is active, you get a `No active note` notice.
-- `Run import (dry run, select rule)` — runs the rule without writing anything; the audit log records `would-write` / `would-skip` / `would-suffix` decisions.
-- `Run export (dry run, select rule)` — same, for export rules.
+- `Dry-run an import rule…` — runs the rule without writing anything; the audit log records `would-write` / `would-skip` / `would-suffix` decisions.
+- `Dry-run an export rule…` — same, for export rules.
 
 If you invoke a `Run …` command while the same rule is already in flight, it is no-op'd and a `Rule already running` notice appears. There is no queueing in v0.1.
 
@@ -192,10 +192,10 @@ cd miyo-hakobi
 git config core.hooksPath .githooks
 npm install
 npm run dev          # esbuild watch mode
-npm run build        # tsc --noEmit + esbuild production build
+npm run build        # type-check + esbuild production build
 npm test             # vitest unit tests
 npm run lint         # eslint with eslint-plugin-obsidianmd
-npm run typecheck    # tsc --noEmit (no emit)
+npm run typecheck    # tsc --noEmit
 ```
 
 `npm run dev` watches `src/` and rebuilds `main.js` on change. To live-test in Obsidian, point the watcher's output at your dev vault's `.obsidian/plugins/miyo-hakobi/` directory and use Obsidian's "Reload app without saving" command (or the Hot-Reload plugin) after each rebuild.
