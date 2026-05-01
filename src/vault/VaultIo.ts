@@ -22,8 +22,10 @@
 //    caller can read `.path` and the consumer-facing types stay structurally
 //    compatible with Obsidian's own surfaces.
 //  - `VaultIoError` carries a closed `kind` discriminator
-//    (`"not-found" | "not-folder"`) so callers can pattern-match typed
-//    failures without parsing strings.
+//    (`"not-found" | "not-folder" | "not-file"`) so callers can pattern-match
+//    typed failures without parsing strings. `"not-file"` is emitted by
+//    `writeBinary` when a TFolder occupies the target path — the slot is not
+//    eligible to be overwritten as a file.
 //  - Structurally compatible with `VaultIoScopeAdapter` from
 //    src/domain/scope.ts on the `existsAtVaultPath` shape. `resolveVaultPath`
 //    is added in T1.10 when other consumers need it.
@@ -41,7 +43,7 @@ import {
 // recoverable error (file/folder not found, wrong kind at path).
 // ---------------------------------------------------------------------------
 
-export type VaultIoErrorKind = "not-found" | "not-folder";
+export type VaultIoErrorKind = "not-found" | "not-folder" | "not-file";
 
 export class VaultIoError extends Error {
   public readonly kind: VaultIoErrorKind;
@@ -80,7 +82,7 @@ export class VaultIo {
    */
   async readBinary(path: string): Promise<ArrayBuffer> {
     const file = this.app.vault.getFileByPath(path);
-    if (file === null || file === undefined) {
+    if (file === null) {
       throw new VaultIoError("not-found", path);
     }
     return this.app.vault.readBinary(file);
@@ -89,12 +91,19 @@ export class VaultIo {
   /**
    * Write a binary buffer at `path`. Modifies an existing file or creates a
    * new one as appropriate. The Vault API handles the read-modify-write.
+   *
+   * @throws VaultIoError(kind='not-file') if a TFolder occupies the path.
    */
   async writeBinary(path: string, bytes: ArrayBuffer): Promise<void> {
     const existing = this.app.vault.getAbstractFileByPath(path);
     if (existing instanceof TFile) {
       await this.app.vault.modifyBinary(existing, bytes);
       return;
+    }
+    if (existing instanceof TFolder) {
+      // A folder occupies the slot; createBinary would fail at the Obsidian
+      // API level. Surface a typed error instead.
+      throw new VaultIoError("not-file", path);
     }
     await this.app.vault.createBinary(path, bytes);
   }

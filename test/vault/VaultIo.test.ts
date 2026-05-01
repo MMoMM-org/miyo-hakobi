@@ -121,6 +121,25 @@ describe("VaultIo — writeBinary", () => {
 		expect(app.vault.createBinary).toHaveBeenCalledWith("media/new.mp3", bytes);
 		expect(app.vault.modifyBinary).not.toHaveBeenCalled();
 	});
+
+	it("throws VaultIoError(kind='not-file') when a TFolder occupies the path", async () => {
+		const app = new App();
+		const folder = makeFolder("media");
+		const bytes = new ArrayBuffer(16);
+		vi.mocked(app.vault.getAbstractFileByPath).mockReturnValueOnce(folder);
+
+		const io = new VaultIo(app);
+		try {
+			await io.writeBinary("media", bytes);
+			throw new Error("expected VaultIoError");
+		} catch (e) {
+			expect(e).toBeInstanceOf(VaultIoError);
+			expect((e as VaultIoError).kind).toBe("not-file");
+			expect((e as VaultIoError).path).toBe("media");
+		}
+		expect(app.vault.modifyBinary).not.toHaveBeenCalled();
+		expect(app.vault.createBinary).not.toHaveBeenCalled();
+	});
 });
 
 // ---------------------------------------------------------------------------
@@ -257,6 +276,21 @@ describe("VaultIo — notesByTag", () => {
 		const out = await io.notesByTag(["#projects"], "any");
 
 		expect(out).toEqual([f]);
+	});
+
+	it("ADR-11 negative: rule '#projects' does NOT match file tag '#projectsplus' (slash boundary required)", async () => {
+		const app = new App();
+		const f = createMockTFile({ path: "p.md" });
+		vi.mocked(app.vault.getMarkdownFiles).mockReturnValueOnce([f]);
+		vi.mocked(app.metadataCache.getFileCache).mockImplementation(() =>
+			tagsCache(["#projectsplus"]),
+		);
+		vi.mocked(getAllTags).mockImplementation((cache) => (cache.tags ?? []).map((t) => t.tag));
+
+		const io = new VaultIo(app);
+		const out = await io.notesByTag(["#projects"], "any");
+
+		expect(out).toEqual([]);
 	});
 
 	it("match='all' rejects when one of the rule tags is not present", async () => {
