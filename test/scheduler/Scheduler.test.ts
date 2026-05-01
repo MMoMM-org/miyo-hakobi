@@ -285,6 +285,29 @@ describe("Scheduler", () => {
 			// the important invariant is that registerInterval is called once per rule).
 			expect(calls[0]).toBeDefined();
 		});
+
+		it("plugin unload via _runCleanup() leaves zero active timers", async () => {
+			const rule = makeImportRule({ everyMinutes: 5 });
+			const importRunner = makeImportRunner();
+			const { scheduler } = buildScheduler({
+				plugin,
+				rules: [rule],
+				importRunner,
+			});
+
+			await scheduler.start();
+
+			// Simulate Obsidian unloading the plugin — this should clear all intervals
+			// registered via plugin.registerInterval (the real Obsidian Plugin does this).
+			plugin._runCleanup();
+
+			// Advance past the interval — runner must NOT fire because the timer was cleared
+			vi.advanceTimersByTime(5 * 60_000 + 1);
+			await Promise.resolve();
+			await Promise.resolve();
+
+			expect(importRunner.run).not.toHaveBeenCalled();
+		});
 	});
 
 	// -------------------------------------------------------------------------

@@ -34,8 +34,14 @@ export interface CachedMetadata {
 
 export class Component {
 	registerDomEvent = vi.fn();
-	registerInterval = vi.fn();
 	registerEvent = vi.fn();
+	// registerInterval: tracks call args for spy assertions AND pushes a
+	// clearInterval cleanup onto the Plugin's _cleanupFns list so that
+	// _runCleanup() faithfully replicates the real Obsidian Plugin.unload()
+	// behaviour (which calls window.clearInterval on every registered ID).
+	// The implementation is injected by Plugin below; Component only declares
+	// the placeholder so subclass code can reference `this.registerInterval`.
+	registerInterval: (id: number) => number = vi.fn();
 }
 
 export class App {
@@ -100,6 +106,16 @@ export class Plugin extends Component {
 	constructor(app?: App) {
 		super();
 		this.app = app ?? new App();
+
+		// Override registerInterval with a spy that ALSO enqueues a clearInterval
+		// cleanup, replicating the real Obsidian Plugin.registerInterval contract.
+		// Using vi.fn().mockImplementation keeps the spy (call tracking) intact so
+		// existing assertions like `expect(plugin.registerInterval).toHaveBeenCalledWith(...)`
+		// continue to work.
+		this.registerInterval = vi.fn().mockImplementation((id: number) => {
+			this._cleanupFns.push(() => window.clearInterval(id));
+			return id;
+		});
 	}
 
 	loadData = vi.fn(async () => ({}));
