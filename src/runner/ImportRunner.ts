@@ -18,7 +18,7 @@
 // (e.g. readBinary(): Promise<Buffer>) and update the write path here accordingly.
 
 import { sanitizeFilename } from "../domain/sanitize";
-import { type ImportRule } from "../domain/rule";
+import { type ImportRule, assertNever } from "../domain/rule";
 import type { Result } from "../domain/rule";
 import {
   type ScopeViolation,
@@ -28,6 +28,8 @@ import {
 import {
   type NodeFs,
   IoNotFoundError,
+  IoPermissionError,
+  IoTimeoutError,
   IoUnknownError,
 } from "../fs/NodeFs";
 import type { VaultIo } from "../vault/VaultIo";
@@ -68,7 +70,10 @@ type FileEntry = { kind: "file"; absPath: string; relPath: string };
 /** A symlinked subdirectory — must be rejected before traversal. */
 type SymlinkEntry = { kind: "symlink"; absPath: string; relPath: string };
 
-type TreeEntry = FileEntry | SymlinkEntry;
+/** An entry whose lstat call failed during enumeration — emits a per-file audit entry. */
+type LstatErrorEntry = { kind: "lstat-error"; absPath: string; relPath: string; error: unknown };
+
+type TreeEntry = FileEntry | SymlinkEntry | LstatErrorEntry;
 
 // Per-file outcome for rule-level summary
 type FileOutcome = "ok" | "skipped" | "rejected" | "error";
@@ -162,6 +167,26 @@ export class ImportRunner {
     const outcomes: FileOutcome[] = [];
 
     for (const entry of treeEntries) {
+      // -----------------------------------------------------------------
+      // lstat failure during enumeration — emit per-file audit entry
+      // -----------------------------------------------------------------
+      if (entry.kind === "lstat-error") {
+        const errorCode: ErrorCode =
+          entry.error instanceof IoTimeoutError   ? "io-timeout"
+          : entry.error instanceof IoPermissionError ? "permission-denied"
+          : entry.error instanceof IoNotFoundError   ? "source-vanished"
+          : "unknown";
+        await auditLog.append({
+          ...base(),
+          operation: "skip",
+          decision: "skipped",
+          sourcePathRelative: entry.relPath,
+          errorCode,
+        });
+        outcomes.push("skipped");
+        continue;
+      }
+
       // -----------------------------------------------------------------
       // Symlinked subdirectory — reject without traversal
       // -----------------------------------------------------------------
@@ -533,8 +558,12 @@ async function enumerateSourceTree(
     let stat: Awaited<ReturnType<NodeFs["lstat"]>>;
     try {
       stat = await fs.lstat(absPath);
-    } catch {
-      continue; // Skip entries we cannot stat
+    } catch (err) {
+      // Return a lstat-error entry so the caller can emit an audit record.
+      // Silent loss is the wrong default — the audit log is the user's
+      // visibility into ferry behaviour.
+      result.push({ kind: "lstat-error", absPath, relPath, error: err });
+      continue;
     }
 
     if (stat.isSymbolicLink()) {
@@ -589,9 +618,9 @@ function mapScopeViolationToErrorCode(reason: ScopeViolation["reason"]): ErrorCo
     case "escape": return "forbidden-path";
     case "traversal": return "forbidden-path";
     case "absolute-in-filename": return "forbidden-path";
-    default:
-      return "unknown";
   }
+  // Exhaustiveness guard — a new ScopeViolationReason variant is a compile error here.
+  assertNever(reason);
 }
 
 function mapIoErrorCode(code: string): ErrorCode {

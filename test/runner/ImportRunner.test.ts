@@ -29,6 +29,7 @@ import type { AuditEntry } from "../../src/audit/AuditEntry";
 import type { LStatResult } from "../../src/fs/NodeFs";
 import {
   IoNotFoundError,
+  IoPermissionError,
   IoUnknownError,
 } from "../../src/fs/NodeFs";
 import type { Result } from "../../src/domain/rule";
@@ -78,10 +79,6 @@ interface FakeFile {
   content: string;
   mtimeMs: number;
   isSymlink?: boolean;
-}
-
-interface FakeDirEntry {
-  type: "file" | "dir" | "symlink-file" | "symlink-dir";
 }
 
 class FakeFs {
@@ -224,7 +221,6 @@ class FakeVault {
 // ---------------------------------------------------------------------------
 
 const NOW_MS = 1000000;
-const NOW_DATE = new Date(NOW_MS);
 
 function buildRunner(opts: {
   fakeFs: FakeFs;
@@ -748,7 +744,62 @@ describe("ImportRunner", () => {
   });
 
   // -------------------------------------------------------------------------
-  // 19. Empty source dir → rule-ok with no per-file entries
+  // 19. lstat failure during enumeration emits per-file audit entry (Finding 1)
+  // -------------------------------------------------------------------------
+
+  it("lstat failure (IoPermissionError) during enumeration → per-file skipped entry with permission-denied", async () => {
+    const fileMtime = NOW_MS - 5000;
+    fakeFs.addDir("/src", ["denied.md", "ok.md"]);
+    fakeFs.addFile("/src/denied.md", "content", fileMtime);
+    fakeFs.addFile("/src/ok.md", "content", fileMtime);
+
+    // Override lstat so that denied.md throws IoPermissionError during enumeration
+    const origLstat = fakeFs.lstat.bind(fakeFs);
+    fakeFs.lstat = async (path: string) => {
+      if (path === "/src/denied.md") {
+        throw new IoPermissionError("lstat", path, new Error("EACCES"));
+      }
+      return origLstat(path);
+    };
+
+    const rule = makeRule();
+    const runner = buildRunner({ fakeFs, fakeVault, auditLog });
+    await runner.run(rule);
+
+    // Should have a per-file skipped entry for denied.md
+    const skippedEntry = auditLog.entries.find(
+      (e) => e.decision === "skipped" && e.sourcePathRelative === "denied.md",
+    );
+    expect(skippedEntry).toBeDefined();
+    expect(skippedEntry?.errorCode).toBe("permission-denied");
+    expect(skippedEntry?.operation).toBe("skip");
+
+    // ok.md should still be processed normally
+    const okEntry = auditLog.entries.find((e) => e.decision === "ok");
+    expect(okEntry).toBeDefined();
+  });
+
+  // -------------------------------------------------------------------------
+  // 20. readdir of sourcePath throws non-IoNotFoundError → propagates to caller (Finding 3)
+  // -------------------------------------------------------------------------
+
+  it("readdir of sourcePath throws non-IoNotFoundError → runner rejects with that error", async () => {
+    // Override readdir for the rule source path to throw a non-IoNotFoundError
+    const origReaddir = fakeFs.readdir.bind(fakeFs);
+    fakeFs.readdir = async (path: string) => {
+      if (path === "/src") {
+        throw new IoUnknownError("readdir", path, new Error("EIO"));
+      }
+      return origReaddir(path);
+    };
+
+    const rule = makeRule();
+    const runner = buildRunner({ fakeFs, fakeVault, auditLog });
+    await expect(runner.run(rule)).rejects.toThrow(IoUnknownError);
+  });
+
+  // -------------------------------------------------------------------------
+  // 21. Empty source dir → rule-ok with no per-file entries
   // -------------------------------------------------------------------------
 
   it("empty source dir → rule-ok with zero per-file entries", async () => {
