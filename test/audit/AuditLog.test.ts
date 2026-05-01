@@ -30,7 +30,7 @@ import {
 } from "../../src/audit/AuditEntry";
 import type { NodeFs } from "../../src/fs/NodeFs";
 import type { RuleId } from "../../src/domain/ruleId";
-import { IoNotFoundError } from "../../src/fs/NodeFs";
+import { IoNotFoundError, IoPermissionError } from "../../src/fs/NodeFs";
 
 // ---------------------------------------------------------------------------
 // In-memory FS stub
@@ -249,6 +249,38 @@ describe("AuditLog.append", () => {
     expect(seen.size).toBe(100);
   });
 
+  it("propagates writeFile errors to the caller and keeps the queue live", async () => {
+    // W1: regression guard — a writeFile failure on the first append must
+    // surface to the caller as a rejected promise, AND a subsequent append on
+    // the SAME log instance must still succeed (the queue is not poisoned by
+    // a prior rejection — `enqueue` chains via `then(fn, fn)` so the next
+    // operation runs whether or not the previous one resolved).
+    const { fs, state } = makeFakeFs();
+    const log = new AuditLog({ fs, getAuditDir: () => AUDIT_DIR });
+
+    const realWriteFile = fs.writeFile.bind(fs);
+    let calls = 0;
+    fs.writeFile = async (path: string, data: string): Promise<void> => {
+      calls += 1;
+      if (calls === 1) {
+        throw new IoPermissionError("writeFile", path, undefined);
+      }
+      await realWriteFile(path, data);
+    };
+
+    await expect(log.append(entry())).rejects.toBeInstanceOf(
+      IoPermissionError,
+    );
+
+    // The second append on the same instance must still succeed; this proves
+    // the internal queue is not poisoned by the prior rejection.
+    await expect(log.append(entry())).resolves.toBeUndefined();
+
+    // Sanity: the second call did land on disk.
+    const filePath = `${AUDIT_DIR}/2026-05.ndjson`;
+    expect(state.files.has(filePath)).toBe(true);
+  });
+
   it("metadata-only invariant: written content never contains absolute path prefixes", async () => {
     // PRD/F5 + Constitution L2: audit files must record metadata only. The
     // closed-list serializer already prevents content/frontmatter/absolute
@@ -423,6 +455,31 @@ describe("AuditLog.purgeAll", () => {
     await log.purgeAll();
 
     expect(state.files.get(`${AUDIT_DIR}/README.txt`)?.contents).toBe("keep");
+  });
+
+  it("propagates non-ENOENT unlink errors", async () => {
+    // W2: regression guard — purgeAll silently ignores ENOENT (a file
+    // disappearing between readdir and unlink is benign), but any other
+    // failure (e.g. permission denied) MUST be re-thrown so the caller
+    // sees the failure. Exercises the `if (!(e instanceof IoNotFoundError))
+    // throw e;` branch in src/audit/AuditLog.ts.
+    const { fs, state } = makeFakeFs();
+    const log = new AuditLog({
+      fs,
+      getAuditDir: () => AUDIT_DIR,
+      nowFn: () => new Date("2026-05-02T00:00:00.000Z"),
+    });
+
+    // Pre-seed a single .ndjson file so listNdjsonFiles returns it.
+    await log.append(entry({ timestamp: "2026-04-30T12:00:00.000Z" }));
+    expect(state.files.has(`${AUDIT_DIR}/2026-04.ndjson`)).toBe(true);
+
+    // Force unlink to reject with a permission error rather than ENOENT.
+    fs.unlink = async (path: string): Promise<void> => {
+      throw new IoPermissionError("unlink", path, undefined);
+    };
+
+    await expect(log.purgeAll()).rejects.toBeInstanceOf(IoPermissionError);
   });
 
   it("is a no-op (apart from the sentinel) when no audit files exist yet", async () => {

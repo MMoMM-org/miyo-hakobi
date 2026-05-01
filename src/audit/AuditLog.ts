@@ -202,10 +202,13 @@ export class AuditLog {
   // -------------------------------------------------------------------------
 
   /**
-   * Chains a unit of work onto the concurrency queue and returns its result.
-   * The queue itself is reset to the unit's terminal promise so subsequent
-   * enqueue calls await it; rejections are kept on the queue's chain so a
-   * later append's read-modify-write still sees the prior file state.
+   * Serialize fs operations through a single Promise chain so 100 concurrent
+   * append() callers cannot interleave their read-modify-write sequences.
+   *
+   * A rejection in the prior link does NOT block the next operation —
+   * `fn` is passed as both fulfilled and rejected handler so the queue
+   * remains live even after a write failure. The error propagates to the
+   * original caller via `next`; the queue itself always advances.
    */
   private enqueue<T>(fn: () => Promise<T>): Promise<T> {
     const next = this.queue.then(fn, fn);
