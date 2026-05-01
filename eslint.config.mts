@@ -33,6 +33,7 @@ export default tseslint.config(
 		"test/__mocks__/**",
 		"test/**/*.test.ts",
 		"test/**/helpers.ts",
+		"test/live/_helpers/**",
 		"test/fixtures/**",
 		"test/*/.obsidian/**",
 		"claude-docker-home/**",

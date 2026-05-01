@@ -31,6 +31,9 @@ _inbox/
 _outbox/
 _archive/
 
+# Live-test scratch — vault-backed E2E tests build tmp source/vault dirs here.
+test/tmp/
+
 # MCP config (may contain API keys)
 .mcp.json
 
