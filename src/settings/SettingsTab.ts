@@ -36,7 +36,7 @@ import { type App, type Plugin, PluginSettingTab } from "obsidian";
 export type SubtabKey = "general" | "import" | "export";
 
 export interface SettingsTabDeps {
-	headerSection: { render(): void };
+	headerSection: { render(containerEl: HTMLElement): void };
 	generalSubtab: { render(containerEl: HTMLElement): void };
 	importSubtab: { render(containerEl: HTMLElement): void };
 	exportSubtab: { render(containerEl: HTMLElement): void };
@@ -111,16 +111,13 @@ export class HakobiSettingsTab extends PluginSettingTab {
 		const { containerEl } = this;
 		emptyEl(containerEl);
 
-		// 1. Header — rendered once; never re-rendered on subtab swap
+		// 1. Header — rendered once; never re-rendered on subtab swap.
+		// The orchestrator creates headerContainer and passes it explicitly so that
+		// HeaderSection renders into the correct DOM node regardless of how deps are
+		// constructed. main.ts (T3.11) constructs HeaderSection without a containerEl
+		// and relies on this render(containerEl) call to supply the target.
 		const headerContainer = createDiv(containerEl, { cls: "hakobi-settings-header" });
-		this.deps.headerSection.render();
-		// HeaderSection uses its own containerEl reference (injected at construction
-		// time in production); in tests the dep is a stub with render: vi.fn().
-		// For the layout to work in production, main.ts wires HeaderSection with
-		// headerContainer as its containerEl. The orchestrator itself only calls
-		// render() — it doesn't inject the container at this point (deps are
-		// already constructed by main.ts per the deps-injection contract).
-		void headerContainer; // referenced in layout comment; kept for clarity
+		this.deps.headerSection.render(headerContainer);
 
 		// 2. Subtab row
 		const subtabRow = createDiv(containerEl, { cls: "hakobi-settings-subtab-row" });

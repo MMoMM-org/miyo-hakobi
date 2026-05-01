@@ -112,13 +112,19 @@ export class HeaderSection {
 	}
 
 	/**
-	 * Populates containerEl with the plugin header: name, tagline, author link,
+	 * Populates a container with the plugin header: name, tagline, author link,
 	 * GitHub repo link, and funding links. Safe to call multiple times (each call
-	 * appends — callers should empty containerEl first if re-rendering).
+	 * appends — callers should empty the container first if re-rendering).
+	 *
+	 * @param containerEl — target element to render into; overrides the
+	 *   constructor-captured containerEl when provided. The orchestrator
+	 *   (SettingsTab) always supplies this so the header lands in the correct
+	 *   layout slot regardless of how deps are wired.
 	 */
-	render(): void {
+	render(containerEl?: HTMLElement): void {
 		const { manifest } = this.plugin;
-		const containerAny = this.containerEl as unknown as Record<string, unknown>;
+		const target = containerEl ?? this.containerEl;
+		const containerAny = target as unknown as Record<string, unknown>;
 
 		// createDiv helper from Obsidian's augmented DOM (preferred over createEl("div"))
 		const createDiv = containerAny["createDiv"] as (opts?: {

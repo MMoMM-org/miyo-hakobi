@@ -6,7 +6,7 @@
  * the header, deep-link initialSubtab argument, and a 50ms perf budget.
  */
 
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { App, Plugin, PluginSettingTab } from "obsidian";
 import { HakobiSettingsTab, type SubtabKey, type SettingsTabDeps } from "../../src/settings/SettingsTab";
 
@@ -14,16 +14,9 @@ import { HakobiSettingsTab, type SubtabKey, type SettingsTabDeps } from "../../s
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeContainer(): HTMLElement {
-	const app = new App();
-	const plugin = new Plugin(app);
-	const tab = new PluginSettingTab(app, plugin);
-	return tab.containerEl;
-}
-
 function makeDeps(): SettingsTabDeps {
 	return {
-		headerSection: { render: vi.fn() },
+		headerSection: { render: vi.fn<[HTMLElement], void>() },
 		generalSubtab: { render: vi.fn() },
 		importSubtab: { render: vi.fn() },
 		exportSubtab: { render: vi.fn() },
@@ -60,10 +53,16 @@ describe("HakobiSettingsTab", () => {
 			expect(tab.containerEl.textContent).not.toContain("old content");
 		});
 
-		it("calls headerSection.render exactly once per display() call", () => {
+		it("calls headerSection.render exactly once per display() call, with the headerContainer element", () => {
 			const { tab, deps } = makeTab();
 			tab.display();
 			expect(deps.headerSection.render).toHaveBeenCalledTimes(1);
+			const [headerContainer] = (deps.headerSection.render as ReturnType<typeof vi.fn>).mock.calls[0] as [HTMLElement];
+			expect(headerContainer).toBeInstanceOf(HTMLElement);
+			// headerContainer must be the .hakobi-settings-header wrapper inside containerEl
+			const found = tab.containerEl.querySelector(".hakobi-settings-header");
+			expect(found).not.toBeNull();
+			expect(headerContainer).toBe(found);
 		});
 
 		it("renders three subtab buttons with labels General, Import, Export", () => {
