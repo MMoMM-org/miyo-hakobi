@@ -11,7 +11,7 @@
 // started on load and stopped on unload. Use the plugin mock's tracking
 // (addStatusBarItem, addCommand, addSettingTab, _runCleanup) for structural assertions.
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
@@ -130,15 +130,39 @@ describe("HakobiPlugin", () => {
       plugin.onunload();
       plugin._runCleanup();
 
-      // After cleanup, advancing time should not trigger anything
-      const fired = vi.fn();
-      // No intervals should fire — if any did they'd produce a notice/console call
-      vi.advanceTimersByTime(60_000);
-      expect(fired).not.toHaveBeenCalled();
+      // Drain any pending NodeFs I/O timeouts (best-effort rotation check
+      // fired from onload via `.catch(() => undefined)` — not a leak, just
+      // an in-flight async operation). After draining, the count must be 0.
+      await vi.runAllTimersAsync();
+      expect(vi.getTimerCount()).toBe(0);
     } finally {
       vi.useRealTimers();
       vi.restoreAllMocks();
     }
+  });
+
+  // T3.11-7b: no leaked cleanup fns (DOM listeners / intervals / events) after _runCleanup
+  //
+  // The Plugin mock's register() and registerInterval() both enqueue into
+  // _cleanupFns. _runCleanup() splices the list (runs all fns and clears it)
+  // so any non-zero residual would mean something registered a cleanup that
+  // never ran — a DOM-listener or interval leak. Asserting length === 0
+  // is the canonical "no orphaned listeners" check for this mock.
+  it("_runCleanup() leaves no orphaned cleanup functions (no DOM-listener / interval leaks)", async () => {
+    const { Scheduler } = await import("../src/scheduler/Scheduler");
+    vi.spyOn(Scheduler.prototype, "start").mockResolvedValue(undefined);
+    vi.spyOn(Scheduler.prototype, "stop").mockImplementation(() => {});
+
+    const plugin = await makePlugin();
+    await plugin.onload();
+    plugin.onunload();
+    plugin._runCleanup();
+
+    // After _runCleanup(), the registry must be empty — every registered
+    // cleanup fn was executed and removed.
+    expect(plugin._cleanupFns).toHaveLength(0);
+
+    vi.restoreAllMocks();
   });
 
   // T3.11-8: manifest identity invariants

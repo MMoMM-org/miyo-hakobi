@@ -36,7 +36,6 @@ import type { VaultIo } from "../vault/VaultIo";
 import { resolveCollisionName, writeVaultAtomic } from "./AtomicWriter";
 import type { AuditLog } from "../audit/AuditLog";
 import type { AuditEntry, ErrorCode } from "../audit/AuditEntry";
-import type { GlobalSettings } from "../types/index";
 
 // ---------------------------------------------------------------------------
 // Dependency injection surface
@@ -57,7 +56,9 @@ export interface ImportRunnerDeps {
   vaultRoot: string;
   pluginDir: string;
   nowFn: () => Date;
-  globalSettings: Pick<GlobalSettings, "stabilityCheckMs">;
+  // stabilityCheckMs is a closure so that live settings changes are picked up
+  // on each run without restarting the plugin (symmetric with NodeFs.timeoutMs).
+  globalSettings: { stabilityCheckMs: () => number };
 }
 
 // ---------------------------------------------------------------------------
@@ -109,7 +110,7 @@ export class ImportRunner {
     const now = nowFn();
     const ts = now.toISOString();
     const nowMs = now.getTime();
-    const { stabilityCheckMs } = globalSettings;
+    const stabilityCheckMs = globalSettings.stabilityCheckMs();
 
     // Helper: base fields for any audit entry in this rule run
     const base = (): Pick<AuditEntry, "timestamp" | "ruleId" | "ruleName" | "direction"> => ({

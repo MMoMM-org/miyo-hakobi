@@ -247,7 +247,7 @@ function buildRunner(opts: {
     vaultRoot: "/vault",
     pluginDir: "/vault/.obsidian/plugins/hakobi",
     nowFn: () => new Date(nowMs),
-    globalSettings: { stabilityCheckMs },
+    globalSettings: { stabilityCheckMs: () => stabilityCheckMs },
   });
 }
 

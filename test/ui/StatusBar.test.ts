@@ -1,10 +1,11 @@
 /**
  * Tests for src/ui/StatusBar.ts
  *
- * Uses a structural fake plugin (addStatusBarItem returns an augmented HTMLElement)
- * rather than the Plugin mock directly, because the Plugin mock's addStatusBarItem
- * returns a plain { setText } stub. We provide an augmented element via a local
- * helper so StatusBar can call classList, addEventListener, setAttribute, etc.
+ * Uses a structural fake plugin with a local augmentEl helper rather than the
+ * Plugin mock directly. The Plugin mock's addStatusBarItem already returns an
+ * augmented HTMLElement (via the shared obsidian mock), but we keep a local
+ * fake for isolation — StatusBar tests must not depend on the shared mock's
+ * internal implementation details, so augmentEl is replicated here.
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";

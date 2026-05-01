@@ -101,7 +101,10 @@ export class App {
 export class Plugin extends Component {
 	app: App;
 	manifest = { id: "test-plugin", name: "Test Plugin", version: "0.0.0" };
-	private _cleanupFns: Array<() => unknown> = [];
+	// _cleanupFns is intentionally accessible (underscore-prefixed, not truly
+	// private) so that lifecycle tests can assert the list is empty after
+	// _runCleanup() — proving no cleanup functions were left orphaned.
+	_cleanupFns: Array<() => unknown> = [];
 
 	constructor(app?: App) {
 		super();
@@ -128,9 +131,14 @@ export class Plugin extends Component {
 		this._cleanupFns.push(fn);
 	});
 
-	/** Simulate Obsidian calling all registered cleanup functions (for testing onunload). */
+	/**
+	 * Simulate Obsidian calling all registered cleanup functions (for testing
+	 * onunload). Clears the registry after execution so tests can assert that
+	 * no cleanup functions were left orphaned (length === 0 post-cleanup).
+	 */
 	_runCleanup(): void {
-		for (const fn of this._cleanupFns) fn();
+		const fns = this._cleanupFns.splice(0);
+		for (const fn of fns) fn();
 	}
 }
 

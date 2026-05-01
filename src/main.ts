@@ -8,7 +8,7 @@
 //
 //   NodeFs → VaultIo → AuditLog + Rotation → RuleStore → DeviceStore
 //   → InFlightRegistry → ImportRunner + ExportRunner → StatusBar
-//   → Scheduler → CommandRegistry → SettingsTab
+//   → Scheduler → SettingsTab → CommandRegistry
 //
 // Known limitation (Phase 4 follow-up):
 //   The Scheduler's onRuleChanged / onRuleRemoved hooks are NOT wired into
@@ -153,7 +153,7 @@ export default class HakobiPlugin extends Plugin {
       pluginDir: pluginDataDir,
       nowFn: () => new Date(),
       globalSettings: {
-        stabilityCheckMs: this.globalSettings.stabilityCheckMs,
+        stabilityCheckMs: () => this.globalSettings.stabilityCheckMs,
       },
     });
 
@@ -270,10 +270,14 @@ export default class HakobiPlugin extends Plugin {
     // ------------------------------------------------------------------
     // 16. Audit file helpers for GeneralSubtab
     // ------------------------------------------------------------------
-    const now = new Date();
-    const yyyy = String(now.getUTCFullYear()).padStart(4, "0");
-    const mm = String(now.getUTCMonth() + 1).padStart(2, "0");
-    const currentMonthAuditPath = (): string => `${auditDir}/${yyyy}-${mm}.ndjson`;
+    // NOTE: date is computed inside the closure so it stays correct across
+    // UTC month boundaries (the plugin can stay loaded for hours/days).
+    const currentMonthAuditPath = (): string => {
+      const d = new Date();
+      const y = String(d.getUTCFullYear()).padStart(4, "0");
+      const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+      return `${auditDir}/${y}-${m}.ndjson`;
+    };
     const auditFilePresent = async (): Promise<boolean> => {
       try {
         await nodeFs.lstat(currentMonthAuditPath());
