@@ -1,6 +1,6 @@
 ---
 title: "Phase 2: Engine — Persistence, Scheduler, Runners"
-status: pending
+status: in_progress
 version: "1.0"
 phase: 2
 ---
@@ -37,7 +37,7 @@ phase: 2
 
 This phase delivers the engine that takes rules and turns them into ferry actions. RuleStore + DeviceStore own persistence; Scheduler + InFlightRegistry own timing; Runners own per-tick execution. After this phase, the engine is fully functional and testable in isolation — the only thing missing is a UI to drive it.
 
-- [ ] **T2.1 RuleStore (`data.json` persistence)** `[activity: data-architecture] [parallel: true]`
+- [x] **T2.1 RuleStore (`data.json` persistence)** `[activity: data-architecture] [parallel: true]`
 
   1. Prime: `[ref: SDD/ADR-3]`, `[ref: SDD/Data Storage Changes]`, `[ref: PRD/F8]`.
   2. Test: `load()` returns empty list on first run; rules round-trip through save/load; schema version mismatch triggers a migration hook (no actual migration needed at v1, but the seam exists); add/update/remove operations are immutable (return new state, do not mutate); rule validation runs on load (invalid persisted rules surface as errors, not silent corruption); credential-shaped strings are NOT persisted (smoke test: ensure no field looks like `password`/`token`/`apiKey`).
@@ -47,7 +47,7 @@ This phase delivers the engine that takes rules and turns them into ferry action
      - [ ] Rules persist in `data.json` only (Sync-replicated when user enables Sync) `[ref: PRD/F8]`
      - [ ] No credentials in `data.json` (asserted via field-name allowlist) `[ref: SDD/CON-2 / Constitution L2]`
 
-- [ ] **T2.2 DeviceStore (`device.json` per-device flags)** `[activity: data-architecture] [parallel: true]`
+- [x] **T2.2 DeviceStore (`device.json` per-device flags)** `[activity: data-architecture] [parallel: true]`
 
   1. Prime: `[ref: SDD/ADR-3]`, `[ref: PRD/F8]`.
   2. Test: First run generates a stable device UUID and persists it; rule enable flag defaults to `false` for newly Synced rules (rule exists in `RuleStore` but not yet in `device.json.ruleEnablement` → `enabledOnThisDevice` resolves to `false`); rule explicitly created on this device defaults to `true`; toggling enable persists; `device.json` is at `<pluginDataDir>/device.json` (NOT inside `data.json`); reading back works after save.
@@ -57,7 +57,7 @@ This phase delivers the engine that takes rules and turns them into ferry action
      - [ ] Newly Synced rule defaults to `enabledOnThisDevice: false` on this device `[ref: PRD/F8]`
      - [ ] `device.json` lives outside `data.json` (asserted via path) `[ref: SDD/ADR-3]`
 
-- [ ] **T2.3 InFlightRegistry** `[activity: domain-modeling] [parallel: true]`
+- [x] **T2.3 InFlightRegistry** `[activity: domain-modeling] [parallel: true]`
 
   1. Prime: `[ref: SDD/ADR-9]`, `[ref: PRD/F3]`.
   2. Test: `tryAcquire(ruleId)` returns `true` on first call, `false` on second; `release(ruleId)` allows re-acquire; concurrent `tryAcquire` calls (simulated via interleaving) return `true` exactly once; size bounded only by enabled rule count.

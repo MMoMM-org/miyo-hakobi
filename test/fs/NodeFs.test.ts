@@ -25,6 +25,7 @@ const mocks = vi.hoisted(() => ({
   readdir: vi.fn(),
   realpath: vi.fn(),
   mkdir: vi.fn(),
+  utimes: vi.fn(),
 }));
 
 vi.mock("node:fs/promises", () => mocks);
@@ -430,6 +431,66 @@ describe("NodeFs — no raw Error leaks", () => {
         expect(e).toBeInstanceOf(IoError);
       }
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// writeFileBinary — writes ArrayBuffer via Buffer.from() (T2.6)
+// ---------------------------------------------------------------------------
+
+describe("NodeFs — writeFileBinary", () => {
+  it("delegates to fsp.writeFile with a Buffer from the ArrayBuffer", async () => {
+    mocks.writeFile.mockResolvedValueOnce(undefined);
+    const fs = fixedTimeout(1000);
+    const data = new Uint8Array([1, 2, 3]).buffer;
+
+    await fs.writeFileBinary("/dest/binary.bin", data);
+
+    expect(mocks.writeFile).toHaveBeenCalledTimes(1);
+    const [path, content] = mocks.writeFile.mock.calls[0] as [string, Buffer];
+    expect(path).toBe("/dest/binary.bin");
+    // Buffer should contain the same bytes as the ArrayBuffer
+    expect(Buffer.isBuffer(content)).toBe(true);
+    expect(Array.from(content)).toEqual([1, 2, 3]);
+  });
+
+  it("surfaces errors as IoError subclasses", async () => {
+    mocks.writeFile.mockRejectedValueOnce(
+      Object.assign(new Error("ENOENT"), { code: "ENOENT" }),
+    );
+    const fs = fixedTimeout(1000);
+    await expect(fs.writeFileBinary("/missing/path", new ArrayBuffer(0))).rejects.toBeInstanceOf(IoError);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// utimes — sets atime + mtime (T2.6)
+// ---------------------------------------------------------------------------
+
+describe("NodeFs — utimes", () => {
+  it("delegates to fsp.utimes with Date objects derived from mtimeMs", async () => {
+    mocks.utimes.mockResolvedValueOnce(undefined);
+    const fs = fixedTimeout(1000);
+    const mtimeMs = 1_700_000_000_000;
+
+    await fs.utimes("/dest/note.md", mtimeMs);
+
+    expect(mocks.utimes).toHaveBeenCalledTimes(1);
+    const [path, atime, mtime] = mocks.utimes.mock.calls[0] as [string, Date, Date];
+    expect(path).toBe("/dest/note.md");
+    expect(atime).toBeInstanceOf(Date);
+    expect(mtime).toBeInstanceOf(Date);
+    expect(mtime.getTime()).toBe(mtimeMs);
+    // atime equals mtime (we pass same Date for both)
+    expect(atime.getTime()).toBe(mtimeMs);
+  });
+
+  it("surfaces errors as IoError subclasses", async () => {
+    mocks.utimes.mockRejectedValueOnce(
+      Object.assign(new Error("EPERM"), { code: "EPERM" }),
+    );
+    const fs = fixedTimeout(1000);
+    await expect(fs.utimes("/no-permission", 0)).rejects.toBeInstanceOf(IoError);
   });
 });
 

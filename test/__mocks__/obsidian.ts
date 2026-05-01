@@ -68,11 +68,13 @@ export class App {
 			stat: vi.fn(async () => null),
 			rename: vi.fn(),
 			remove: vi.fn(),
+			getBasePath: vi.fn(() => "/vault"),
 		},
 		configDir: ".obsidian",
 	};
 	fileManager = {
 		processFrontMatter: vi.fn(),
+		trashFile: vi.fn(async () => {}),
 	};
 	workspace = {
 		getActiveViewOfType: vi.fn(),

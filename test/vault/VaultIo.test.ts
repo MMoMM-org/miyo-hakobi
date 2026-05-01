@@ -41,7 +41,7 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("VaultIo — construction", () => {
-	it("exposes the nine required methods", () => {
+	it("exposes all required methods", () => {
 		const app = new App();
 		const io = new VaultIo(app);
 		expect(typeof io.readBinary).toBe("function");
@@ -53,6 +53,10 @@ describe("VaultIo — construction", () => {
 		expect(typeof io.ensureFolder).toBe("function");
 		expect(typeof io.renameInVault).toBe("function");
 		expect(typeof io.removeInVault).toBe("function");
+		// T2.6 additions
+		expect(typeof io.fileByPath).toBe("function");
+		expect(typeof io.deleteNote).toBe("function");
+		expect(typeof io.resolveVaultPath).toBe("function");
 	});
 });
 
@@ -467,5 +471,98 @@ describe("VaultIo — removeInVault", () => {
 		const io = new VaultIo(app);
 
 		await expect(io.removeInVault("Inbox/x.tmp")).rejects.toBe(boom);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// fileByPath — thin wrapper around app.vault.getFileByPath (T2.6)
+// ---------------------------------------------------------------------------
+
+describe("VaultIo — fileByPath", () => {
+	it("returns TFile when getFileByPath resolves a path", () => {
+		const app = new App();
+		const file = createMockTFile({ path: "Notes/note.md" });
+		vi.mocked(app.vault.getFileByPath).mockReturnValueOnce(file);
+
+		const io = new VaultIo(app);
+		const result = io.fileByPath("Notes/note.md");
+
+		expect(result).toBe(file);
+		expect(app.vault.getFileByPath).toHaveBeenCalledWith("Notes/note.md");
+	});
+
+	it("returns null when getFileByPath finds no file", () => {
+		const app = new App();
+		vi.mocked(app.vault.getFileByPath).mockReturnValueOnce(null);
+
+		const io = new VaultIo(app);
+		const result = io.fileByPath("missing.md");
+
+		expect(result).toBeNull();
+	});
+});
+
+// ---------------------------------------------------------------------------
+// deleteNote — delegates to vault.delete (T2.6)
+// Note: uses vault.delete instead of fileManager.trashFile because trashFile
+// requires Obsidian ≥1.6.6 and minAppVersion is 1.5.7.
+// ---------------------------------------------------------------------------
+
+describe("VaultIo — deleteNote", () => {
+	it("calls vault.delete with the TFile", async () => {
+		const app = new App();
+		const file = createMockTFile({ path: "Notes/note.md" });
+		vi.mocked(app.vault.delete).mockResolvedValueOnce(undefined);
+		const io = new VaultIo(app);
+
+		await io.deleteNote(file);
+
+		expect(app.vault.delete).toHaveBeenCalledWith(file);
+	});
+
+	it("propagates errors from vault.delete", async () => {
+		const app = new App();
+		const file = createMockTFile({ path: "Notes/note.md" });
+		const boom = new Error("delete failed");
+		vi.mocked(app.vault.delete).mockRejectedValueOnce(boom);
+		const io = new VaultIo(app);
+
+		await expect(io.deleteNote(file)).rejects.toBe(boom);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// resolveVaultPath — converts vault-relative paths to absolute FS paths (T2.6)
+// ---------------------------------------------------------------------------
+
+describe("VaultIo — resolveVaultPath", () => {
+	it("returns vault root for empty string input", () => {
+		const app = new App();
+		vi.mocked(app.vault.adapter.getBasePath).mockReturnValue("/vault");
+		const io = new VaultIo(app);
+
+		const result = io.resolveVaultPath("");
+
+		expect(result).toBe("/vault");
+	});
+
+	it("joins base path with a vault-relative path", () => {
+		const app = new App();
+		vi.mocked(app.vault.adapter.getBasePath).mockReturnValue("/vault");
+		const io = new VaultIo(app);
+
+		const result = io.resolveVaultPath("Notes/note.md");
+
+		expect(result).toBe("/vault/Notes/note.md");
+	});
+
+	it("strips leading slash from vault-relative path", () => {
+		const app = new App();
+		vi.mocked(app.vault.adapter.getBasePath).mockReturnValue("/vault");
+		const io = new VaultIo(app);
+
+		const result = io.resolveVaultPath("/Notes/note.md");
+
+		expect(result).toBe("/vault/Notes/note.md");
 	});
 });

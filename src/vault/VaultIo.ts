@@ -27,8 +27,16 @@
 //    `writeBinary` when a TFolder occupies the target path — the slot is not
 //    eligible to be overwritten as a file.
 //  - Structurally compatible with `VaultIoScopeAdapter` from
-//    src/domain/scope.ts on the `existsAtVaultPath` shape. `resolveVaultPath`
-//    is added in T1.10 when other consumers need it.
+//    src/domain/scope.ts on the `existsAtVaultPath` shape.
+//  - T2.6 ExportRunner additions:
+//    `fileByPath(path)` — thin wrapper around `app.vault.getFileByPath` so
+//    ExportRunner can resolve a vault-relative note path to a TFile without
+//    reaching into Obsidian directly.
+//    `deleteNote(file)` — wraps `app.vault.delete` so ExportRunner's
+//    `action: move` can remove the vault note after the FS write is confirmed.
+//    `resolveVaultPath(path)` — converts a vault-relative path to an absolute
+//    FS path via `app.vault.adapter.getBasePath()`. Required by
+//    `VaultIoScopeAdapter` (scope.ts) and ExportRunner's scope validation.
 
 import {
   type App,
@@ -36,6 +44,7 @@ import {
   TFile,
   TFolder,
   getAllTags,
+  normalizePath,
 } from "obsidian";
 
 // ---------------------------------------------------------------------------
@@ -219,5 +228,55 @@ export class VaultIo {
    */
   async removeInVault(path: string): Promise<void> {
     await this.app.vault.adapter.remove(path);
+  }
+
+  /**
+   * Resolve a vault-relative path to an absolute filesystem path.
+   * Uses `app.vault.adapter.getBasePath()` — the canonical way to get the
+   * vault root on desktop Obsidian (Electron / DataAdapter). Empty-string
+   * input returns the vault root itself.
+   *
+   * Added in T2.6 to satisfy `VaultIoScopeAdapter.resolveVaultPath` and to
+   * give ExportRunner a typed way to compute absolute child paths for
+   * scope validation without reaching into Obsidian internals directly.
+   */
+  resolveVaultPath(vaultRelPath: string): string {
+    const adapter = this.app.vault.adapter as unknown as { getBasePath(): string };
+    const base = adapter.getBasePath();
+    const trimmed = vaultRelPath.replace(/^\/+/, "").replace(/\/+$/, "");
+    if (trimmed === "") return base;
+    return normalizePath(`${base}/${trimmed}`);
+  }
+
+  /**
+   * Look up a TFile by vault-relative path. Returns null if no file exists
+   * at the path (mirrors Obsidian's own `getFileByPath` semantics).
+   *
+   * Added in T2.6 for ExportRunner's `sourceType: note` branch, which needs
+   * to resolve a vault-relative note path to a TFile without knowing about
+   * the Obsidian API directly.
+   */
+  fileByPath(path: string): TFile | null {
+    return this.app.vault.getFileByPath(path);
+  }
+
+  /**
+   * Delete a vault note after a successful export write. Used by ExportRunner's
+   * `action: move` branch.
+   *
+   * We use `vault.delete()` rather than `fileManager.trashFile()` here because
+   * `trashFile` was added in Obsidian v1.6.6 and Hakobi's `minAppVersion` is
+   * 1.5.7 — using it would fail on older Obsidian installs. When the minimum
+   * version is raised to ≥ 1.6.6, replace `vault.delete` with
+   * `fileManager.trashFile` to respect the user's system-trash preference.
+   *
+   * eslint-disable-next-line comment below suppresses the prefer-file-manager-
+   * trash-file warning for exactly this call site.
+   *
+   * Added in T2.6.
+   */
+  async deleteNote(file: TFile): Promise<void> {
+    // eslint-disable-next-line obsidianmd/prefer-file-manager-trash-file -- trashFile needs Obsidian ≥1.6.6; minAppVersion is 1.5.7
+    await this.app.vault.delete(file);
   }
 }

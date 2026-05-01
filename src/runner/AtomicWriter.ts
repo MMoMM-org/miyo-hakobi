@@ -24,6 +24,11 @@
 //    final destination from concurrent calls are therefore astronomically
 //    unlikely. The temp path is always a sibling of the final file (not a
 //    process-wide tmpdir) so rename is same-volume on any reasonable layout.
+//  - T2.6 ExportRunner addition: `writeFsBinaryAtomic` mirrors `writeFsAtomic`
+//    but accepts an ArrayBuffer so ExportRunner can write vault note bytes to
+//    the FS without going through a string encoding path that would corrupt
+//    non-ASCII bytes. NodeFs.writeFileBinary (added in T2.6) is the backing
+//    adapter method.
 
 import type { NodeFs } from "../fs/NodeFs";
 import type { VaultIo } from "../vault/VaultIo";
@@ -85,6 +90,34 @@ export async function writeFsAtomic(
 			await fs.unlink(tmp);
 		} catch {
 			// intentional
+		}
+		throw err;
+	}
+}
+
+// ---------------------------------------------------------------------------
+// writeFsBinaryAtomic — external FS write for binary (ArrayBuffer) content.
+//
+// Added in T2.6 for ExportRunner: vault note bytes come out of Obsidian as
+// ArrayBuffer; NodeFs.writeFileBinary preserves them byte-for-byte. The
+// temp-then-rename pattern is identical to writeFsAtomic so no half-files
+// land at the destination on failure.
+// ---------------------------------------------------------------------------
+
+export async function writeFsBinaryAtomic(
+	fs: NodeFs,
+	path: string,
+	data: ArrayBuffer,
+): Promise<void> {
+	const tmp = `${path}.tmp.${randomToken()}`;
+	try {
+		await fs.writeFileBinary(tmp, data);
+		await fs.rename(tmp, path);
+	} catch (err) {
+		try {
+			await fs.unlink(tmp);
+		} catch {
+			// intentional — cleanup is best-effort
 		}
 		throw err;
 	}

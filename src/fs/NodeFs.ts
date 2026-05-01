@@ -30,6 +30,16 @@
 //    transfer engines need (`FsScopeAdapter['lstat']`).
 //  - POSIX paths only at this layer; T1.5 PathSafe handles cross-OS
 //    normalisation upstream.
+//  - T2.6 ExportRunner additions:
+//    `writeFileBinary(path, ArrayBuffer)` — writes a binary buffer (vault
+//    notes are binary in Obsidian's API). Needed because `writeFile` only
+//    accepts string in v0.1; adding a narrow binary variant avoids converting
+//    ArrayBuffer through a string encoding (which would corrupt non-ASCII
+//    bytes on certain platforms).
+//    `utimes(path, mtimeMs)` — preserves vault note mtime on the FS
+//    destination after an atomic write, per ADR-6. The write itself resets
+//    mtime; this call restores it so consumers that rely on mtime (e.g.
+//    cloud-sync delta scanners) see the vault's original modification time.
 
 import * as fsp from "node:fs/promises";
 
@@ -206,6 +216,30 @@ export class NodeFs {
     return this.runWithTimeout("mkdir", path, async () => {
       await fsp.mkdir(path, { recursive: true });
     });
+  }
+
+  /**
+   * Write a binary buffer to the filesystem path. Needed by ExportRunner
+   * (T2.6) — vault notes are ArrayBuffer from the Obsidian Vault API, and
+   * encoding through a string would corrupt non-ASCII bytes. The Node.js
+   * Buffer constructor accepts ArrayBuffer directly.
+   */
+  writeFileBinary(path: string, data: ArrayBuffer): Promise<void> {
+    return this.runWithTimeout("writeFileBinary", path, () =>
+      fsp.writeFile(path, Buffer.from(data)),
+    );
+  }
+
+  /**
+   * Set the access and modification times of a file at `path`. Used by
+   * ExportRunner (T2.6) after an atomic write to restore the vault note's
+   * original mtime on the FS destination (ADR-6: mtime preserved on export).
+   * The second argument is a Unix epoch milliseconds value (TFile.stat.mtime).
+   * `atime` is set equal to `mtimeMs` — only mtime semantics matter here.
+   */
+  utimes(path: string, mtimeMs: number): Promise<void> {
+    const t = new Date(mtimeMs);
+    return this.runWithTimeout("utimes", path, () => fsp.utimes(path, t, t));
   }
 
   // -------------------------------------------------------------------------

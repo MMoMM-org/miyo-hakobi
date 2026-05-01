@@ -21,6 +21,7 @@ import { describe, it, expect, vi } from "vitest";
 import {
 	resolveCollisionName,
 	writeFsAtomic,
+	writeFsBinaryAtomic,
 	writeVaultAtomic,
 	MAX_SUFFIX_ATTEMPTS,
 } from "../../src/runner/AtomicWriter";
@@ -33,15 +34,17 @@ import type { VaultIo } from "../../src/vault/VaultIo";
 
 /**
  * Build a minimal NodeFs-shaped stub for AtomicWriter's needs.
- * AtomicWriter only calls writeFile / rename / unlink on the FS adapter.
+ * AtomicWriter only calls writeFile / writeFileBinary / rename / unlink.
  */
 function makeFsStub(opts?: {
 	writeFile?: (path: string, data: string) => Promise<void>;
+	writeFileBinary?: (path: string, data: ArrayBuffer) => Promise<void>;
 	rename?: (from: string, to: string) => Promise<void>;
 	unlink?: (path: string) => Promise<void>;
 }): NodeFs {
 	const stub = {
 		writeFile: vi.fn(opts?.writeFile ?? (async () => {})),
+		writeFileBinary: vi.fn(opts?.writeFileBinary ?? (async () => {})),
 		rename: vi.fn(opts?.rename ?? (async () => {})),
 		unlink: vi.fn(opts?.unlink ?? (async () => {})),
 	};
@@ -347,5 +350,67 @@ describe("writeVaultAtomic", () => {
 			(o) => o.op === "writeBinary" && o.path === "Inbox/final.md",
 		);
 		expect(writesAtFinal).toHaveLength(0);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// writeFsBinaryAtomic — external FS write for binary (ArrayBuffer) data (T2.6)
+// ---------------------------------------------------------------------------
+
+describe("writeFsBinaryAtomic", () => {
+	it("writes to <path>.tmp.<rand> then renames to final path; no unlink", async () => {
+		const fs = makeFsStub();
+		const data = new Uint8Array([10, 20, 30]).buffer;
+		await writeFsBinaryAtomic(fs, "/dest/binary.bin", data);
+
+		expect(fs.writeFileBinary).toHaveBeenCalledTimes(1);
+		const writeCall = vi.mocked(fs.writeFileBinary).mock.calls[0];
+		expect(writeCall[0]).toMatch(/^\/dest\/binary\.bin\.tmp\.[\w-]+$/);
+		expect(writeCall[1]).toBe(data);
+
+		expect(fs.rename).toHaveBeenCalledTimes(1);
+		const renameCall = vi.mocked(fs.rename).mock.calls[0];
+		expect(renameCall[0]).toBe(writeCall[0]); // tmp → final
+		expect(renameCall[1]).toBe("/dest/binary.bin");
+
+		expect(fs.unlink).not.toHaveBeenCalled();
+	});
+
+	it("on writeFileBinary failure: unlinks tmp, re-throws original error", async () => {
+		const original = new Error("binary write boom");
+		const fs = makeFsStub({
+			writeFileBinary: async () => { throw original; },
+		});
+
+		await expect(writeFsBinaryAtomic(fs, "/dest/x.bin", new ArrayBuffer(0))).rejects.toBe(original);
+
+		expect(fs.rename).not.toHaveBeenCalled();
+		expect(fs.unlink).toHaveBeenCalledTimes(1);
+		const unlinkCall = vi.mocked(fs.unlink).mock.calls[0];
+		expect(unlinkCall[0]).toMatch(/^\/dest\/x\.bin\.tmp\.[\w-]+$/);
+	});
+
+	it("on rename failure: unlinks tmp, re-throws original error", async () => {
+		const original = new Error("rename boom");
+		const fs = makeFsStub({
+			rename: async () => { throw original; },
+		});
+
+		await expect(writeFsBinaryAtomic(fs, "/dest/y.bin", new ArrayBuffer(0))).rejects.toBe(original);
+
+		expect(fs.writeFileBinary).toHaveBeenCalledTimes(1);
+		const tmp = vi.mocked(fs.writeFileBinary).mock.calls[0][0];
+		expect(fs.unlink).toHaveBeenCalledWith(tmp);
+	});
+
+	it("cleanup is best-effort: an unlink failure does NOT mask the original error", async () => {
+		const original = new Error("write boom");
+		const cleanupErr = new Error("unlink boom — should be swallowed");
+		const fs = makeFsStub({
+			writeFileBinary: async () => { throw original; },
+			unlink: async () => { throw cleanupErr; },
+		});
+
+		await expect(writeFsBinaryAtomic(fs, "/dest/z.bin", new ArrayBuffer(0))).rejects.toBe(original);
 	});
 });
