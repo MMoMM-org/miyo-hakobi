@@ -98,7 +98,7 @@ describe("sanitizeFilename", () => {
   });
 
   // ── Rule 5: Obsidian-invalid char replacement ─────────────────────────────
-  describe("Rule 5 — Obsidian-invalid character replacement", () => {
+  describe("Rule 5 — Obsidian-invalid char replacement (* \" < > : | ?)", () => {
     it("replaces `*` with `_`", () => {
       expect(sanitizeFilename("draft*.md")).toEqual({ ok: true, name: "draft_.md" });
     });
@@ -110,10 +110,15 @@ describe("sanitizeFilename", () => {
       });
     });
 
-    it("replaces `\\` with `_` (already stripped by rule 2 basename, test embedded)", () => {
-      // embedded backslash in last segment — rule 5 replaces it
-      // After rule 2: basename of "a\\b" is "b" (split on \\), so test directly
-      expect(sanitizeFilename("note.md")).toEqual({ ok: true, name: "note.md" });
+    it("takes basename when input contains `\\` (step 2 consumes backslash as path separator, not step 5)", () => {
+      // `\` and `/` are consumed by step 2 (basename extraction via split(/[\\/]/)),
+      // so they never reach step 5's OBSIDIAN_INVALID replacement.
+      // OBSIDIAN_INVALID no longer contains `\` or `/`.
+      expect(sanitizeFilename("a\\b")).toEqual({ ok: true, name: "b" });
+    });
+
+    it("takes basename when input contains `/` (step 2 consumes forward-slash as path separator, not step 5)", () => {
+      expect(sanitizeFilename("a/b.md")).toEqual({ ok: true, name: "b.md" });
     });
 
     it("replaces `<` and `>` with `_`", () => {
@@ -262,6 +267,19 @@ describe("sanitizeFilename", () => {
       expect(sanitizeFilename("🎙️ recording.m4a")).toEqual({
         ok: true,
         name: "🎙️ recording.m4a",
+      });
+    });
+
+    it("rejects a multi-segment input whose total byte length exceeds 1024, even when basename is short", () => {
+      // 200-char segment repeated 6 times = 1200-byte total input → exceeds 1024
+      // but the final basename ("short.md") is only 8 bytes — segment cap alone would pass it.
+      // The 1024-byte total cap must be applied to the original input before basename extraction.
+      const longSegment = "a".repeat(200);
+      const input = `${longSegment}/${longSegment}/${longSegment}/${longSegment}/${longSegment}/${longSegment}/short.md`;
+      expect(new TextEncoder().encode(input).byteLength).toBeGreaterThan(1024);
+      expect(sanitizeFilename(input)).toEqual({
+        ok: false,
+        reason: "sanitization-rejected",
       });
     });
   });

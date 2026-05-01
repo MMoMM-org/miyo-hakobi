@@ -1,10 +1,10 @@
 // Filename sanitization for Hakobi import rules.
 // Pure function — no side effects, no imports. TextEncoder is a global.
-// Implements the 9-step pipeline from ADR-013 / spec 001-v0-1 T1.1.
+// Implements the 10-step pipeline from ADR-013 / spec 001-v0-1 T1.1.
 
 // eslint-disable-next-line no-control-regex -- intentional: stripping control characters is the purpose of this regex
 const CONTROL_CHARS = /[\x00-\x1F\x7F]/g;
-const OBSIDIAN_INVALID = /[*"\\/<>:|?]/g;
+const OBSIDIAN_INVALID = /[*"<>:|?]/g;
 const RESERVED_WIN = /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\..*)?$/i;
 const HOUSEKEEPING = new Set([
   ".DS_Store", "Thumbs.db", "desktop.ini", ".localized",
@@ -22,35 +22,36 @@ export function sanitizeFilename(input: string): SanitizeResult {
   // 1. Reject NUL anywhere
   if (input.includes("\0")) return { ok: false, reason: "sanitization-rejected" };
 
-  // 2. Take basename only — strip path separators, reject inputs with traversal segments
+  // 2. Total path length cap — applied to original input before basename extraction
+  if (new TextEncoder().encode(input).byteLength > MAX_TOTAL_BYTES) {
+    return { ok: false, reason: "sanitization-rejected" };
+  }
+
+  // 3. Take basename only — strip path separators, reject inputs with traversal segments
   const segments = input.split(/[/\\]/);
   if (segments.some((s) => s === "..")) return { ok: false, reason: "sanitization-rejected" };
   const last = segments.pop() ?? "";
 
-  // 3. Skip OS housekeeping files
+  // 4. Skip OS housekeeping files
   if (HOUSEKEEPING.has(last)) return { ok: false, reason: "housekeeping-file" };
 
-  // 4. Strip control chars
+  // 5. Strip control chars
   let name = last.replace(CONTROL_CHARS, "");
 
-  // 5. Replace Obsidian-invalid chars with `_`
+  // 6. Replace Obsidian-invalid chars with `_` (`\` and `/` already consumed by step 3)
   name = name.replace(OBSIDIAN_INVALID, "_");
 
-  // 6. Trim leading/trailing dots and whitespace
+  // 7. Trim leading/trailing dots and whitespace
   name = name.replace(/^[.\s]+|[.\s]+$/g, "");
 
-  // 7. Rename Windows-reserved names
+  // 8. Rename Windows-reserved names
   if (RESERVED_WIN.test(name)) name = `${name}-file`;
 
-  // 8. Empty after sanitization → reject
+  // 9. Empty after sanitization → reject
   if (name.length === 0) return { ok: false, reason: "sanitization-empty" };
 
-  // 9. Length caps (UTF-8 byte length, not char length)
-  const enc = new TextEncoder();
-  if (enc.encode(name).byteLength > MAX_SEGMENT_BYTES) {
-    return { ok: false, reason: "sanitization-rejected" };
-  }
-  if (enc.encode(name).byteLength > MAX_TOTAL_BYTES) {
+  // 10. Segment byte-length cap (UTF-8 bytes, not char length)
+  if (new TextEncoder().encode(name).byteLength > MAX_SEGMENT_BYTES) {
     return { ok: false, reason: "sanitization-rejected" };
   }
 
