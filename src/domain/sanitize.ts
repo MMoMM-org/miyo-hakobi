@@ -2,8 +2,9 @@
 // Pure function — no side effects, no imports. TextEncoder is a global.
 // Implements the 10-step pipeline from ADR-013 / spec 001-v0-1 T1.1.
 
+// NUL (\x00) intentionally excluded — it is handled by step 1's outright rejection.
 // eslint-disable-next-line no-control-regex -- intentional: stripping control characters is the purpose of this regex
-const CONTROL_CHARS = /[\x00-\x1F\x7F]/g;
+const CONTROL_CHARS = /[\x01-\x1F\x7F]/g;
 const OBSIDIAN_INVALID = /[*"<>:|?]/g;
 const RESERVED_WIN = /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\..*)?$/i;
 const HOUSEKEEPING = new Set([
@@ -11,8 +12,9 @@ const HOUSEKEEPING = new Set([
   ".AppleDouble", "$RECYCLE.BIN", "System Volume Information",
 ]);
 
-const MAX_SEGMENT_BYTES = 255;
-const MAX_TOTAL_BYTES = 1024;
+const ENCODER = new TextEncoder();
+export const MAX_SEGMENT_BYTES = 255;
+export const MAX_TOTAL_BYTES = 1024;
 
 export type SanitizeResult =
   | { ok: true; name: string }
@@ -23,7 +25,7 @@ export function sanitizeFilename(input: string): SanitizeResult {
   if (input.includes("\0")) return { ok: false, reason: "sanitization-rejected" };
 
   // 2. Total path length cap — applied to original input before basename extraction
-  if (new TextEncoder().encode(input).byteLength > MAX_TOTAL_BYTES) {
+  if (ENCODER.encode(input).byteLength > MAX_TOTAL_BYTES) {
     return { ok: false, reason: "sanitization-rejected" };
   }
 
@@ -51,7 +53,7 @@ export function sanitizeFilename(input: string): SanitizeResult {
   if (name.length === 0) return { ok: false, reason: "sanitization-empty" };
 
   // 10. Segment byte-length cap (UTF-8 bytes, not char length)
-  if (new TextEncoder().encode(name).byteLength > MAX_SEGMENT_BYTES) {
+  if (ENCODER.encode(name).byteLength > MAX_SEGMENT_BYTES) {
     return { ok: false, reason: "sanitization-rejected" };
   }
 

@@ -187,6 +187,15 @@ describe("sanitizeFilename", () => {
         name: "filename",
       });
     });
+
+    // Rule 6 — Unicode whitespace edge cases
+    it("trims a leading NBSP (\\u00A0) — \\s matches it", () => {
+      expect(sanitizeFilename(" note.md")).toEqual({ ok: true, name: "note.md" });
+    });
+
+    it("does NOT trim leading zero-width space (\\u200B) — \\s does not match it (documented current behavior)", () => {
+      expect(sanitizeFilename("​note.md")).toEqual({ ok: true, name: "​note.md" });
+    });
   });
 
   // ── Rule 7: Windows-reserved name suffixing ───────────────────────────────
@@ -268,6 +277,16 @@ describe("sanitizeFilename", () => {
         ok: true,
         name: "🎙️ recording.m4a",
       });
+    });
+
+    it("rejects a 256-byte name where the boundary char is multi-byte (€ = 3 bytes; 253 + 3 = 256)", () => {
+      const input = "a".repeat(253) + "€";
+      expect(sanitizeFilename(input)).toEqual({ ok: false, reason: "sanitization-rejected" });
+    });
+
+    it("accepts a 255-byte name where the boundary char is multi-byte (€ = 3 bytes; 252 + 3 = 255)", () => {
+      const input = "a".repeat(252) + "€";
+      expect(sanitizeFilename(input)).toEqual({ ok: true, name: input });
     });
 
     it("rejects a multi-segment input whose total byte length exceeds 1024, even when basename is short", () => {
