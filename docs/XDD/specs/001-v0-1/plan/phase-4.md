@@ -1,6 +1,6 @@
 ---
 title: "Phase 4: Integration, E2E, Polish"
-status: pending
+status: in_progress
 version: "1.0"
 phase: 4
 ---
@@ -34,7 +34,7 @@ phase: 4
 
 This phase glues the engine and UI into observably-correct behavior, hardens the user-facing documentation, and verifies non-functional targets (bundle size, lint cleanliness, security posture). After this phase, v0.1 is shippable.
 
-- [ ] **T4.1 Plugin lifecycle integration test** `[activity: validate] [parallel: true]`
+- [x] **T4.1 Plugin lifecycle integration test** `[activity: validate] [parallel: true]`
 
   1. Prime: `[ref: SDD/Quality Requirements/Reliability]`, `test/__mocks__/obsidian.ts` (`Plugin._runCleanup`), `test/CLAUDE.md`.
   2. Test: `test/lifecycle/unload.test.ts` — instantiates `HakobiPlugin` in the mock, calls `onload()`, asserts Scheduler is running and timers are registered; calls `onunload()` (or `_runCleanup()`); asserts all timers cleared, all DOM listeners removed, all command registrations released; runs the full sequence twice in a single test to assert no state leaks across reloads (relevant for hot-reload during development).
@@ -62,7 +62,7 @@ This phase glues the engine and UI into observably-correct behavior, hardens the
   5. Success:
      - [ ] All three export source-types verified end-to-end `[ref: PRD/F2]`
 
-- [ ] **T4.4 PRIVACY.md update** `[activity: documentation] [parallel: true]`
+- [x] **T4.4 PRIVACY.md update** `[activity: documentation] [parallel: true]`
 
   1. Prime: `[ref: PRD/Risks and Mitigations]`, `[ref: SDD/Constraints; CON-1, CON-3, CON-4]`, current `PRIVACY.md`.
   2. Test: PRIVACY.md sections present — Network surfaces (none), Data stored locally (rule defs + per-device flags + audit), Data sent externally (none), Audit log scope (metadata-only, fields enumerated), Symlinks (refused), Cloud-sync destinations (user's responsibility), Cross-plugin readability (data dir is readable by other plugins). Linkable from README.
@@ -71,14 +71,14 @@ This phase glues the engine and UI into observably-correct behavior, hardens the
   5. Success:
      - [ ] Every Constitution L1/L2 Privacy item explicitly addressed `[ref: ~/Kouzou/projects/miyo/miyo-constitution.md]`
 
-- [ ] **T4.5 README.md update** `[activity: documentation] [parallel: true]`
+- [x] **T4.5 README.md update** `[activity: documentation] [parallel: true]`
 
   1. Prime: current `README.md`, `[ref: PRD/Product Overview]`, `[ref: SDD/UI Visualization Guide]`.
   2. Test: README sections — what Hakobi does (one-liner from PRD vision), key non-features (Won't-Have list), install + first-run flow, command list (7 commands), audit-log location, settings layout (3 subtabs), per-device enablement explanation (the most-likely-to-confuse behavior), troubleshooting FAQ ("rules don't run" → check `enabledOnThisDevice`; "Show audit log" doesn't open → check OS default app for .ndjson).
   3. Implement: rewrite `README.md`.
   4. Validate: render check (preview as Obsidian community-plugin listing description). Link check.
   5. Success:
-     - [ ] Documents at least one piece of non-obvious behavior per `[ref: PRD/Risks and Mitigations]` row `[ref: SDD/Implementation Gotchas]`
+     - [x] Documents at least one piece of non-obvious behavior per `[ref: PRD/Risks and Mitigations]` row `[ref: SDD/Implementation Gotchas]`
 
 - [ ] **T4.6 Build / bundle / lint hardening** `[activity: validate]`
 
