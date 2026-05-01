@@ -44,7 +44,7 @@ This phase glues the engine and UI into observably-correct behavior, hardens the
      - [ ] Zero active timers after `onunload` `[ref: SDD/Quality Requirements/Reliability]`
      - [ ] Two consecutive load/unload cycles leave no residual state `[ref: SDD/Implementation Gotchas]`
 
-- [ ] **T4.2 End-to-end import flow (vault-backed)** `[activity: validate] [parallel: true]`
+- [x] **T4.2 End-to-end import flow (vault-backed)** `[activity: validate] [parallel: true]`
 
   1. Prime: `package.json`/`vitest.live.config.ts`, `test/Hakobi/`, `[ref: PRD/F1]`, `[ref: SDD/Runtime View/Primary Flow]`.
   2. Test: under `test/live/import.live.test.ts` — set up a tmp source dir with a small file tree (including a `.DS_Store` and one Obsidian-invalid-named file); construct a real `HakobiPlugin` against the test vault; create an import rule via `RuleStore.add`; trigger `Scheduler.runOnce(rule.id)`; assert files appear in vault per `flattenOnTarget` setting; assert `.DS_Store` is skipped with `housekeeping-file`; assert Obsidian-invalid name is renamed; read back the audit NDJSON and verify entries match expectations; tear down tmp dir.
@@ -53,7 +53,7 @@ This phase glues the engine and UI into observably-correct behavior, hardens the
   5. Success:
      - [ ] At least one happy path AND one failure path verified end-to-end `[ref: PRD/F1, Constitution L2 Testing]`
 
-- [ ] **T4.3 End-to-end export flow (vault-backed)** `[activity: validate] [parallel: true]`
+- [x] **T4.3 End-to-end export flow (vault-backed)** `[activity: validate] [parallel: true]`
 
   1. Prime: same as T4.2 plus `[ref: PRD/F2]`.
   2. Test: under `test/live/export.live.test.ts` — three sub-cases (folder export, tag export, single-note export); set up a tmp destination dir; create the matching export rule; trigger `runOnce`; assert files land at destination with correct paths under `flattenOnTarget` setting; tag rule confirms nested-tag matching (ADR-11); single-note "missing" path triggers `source-note-missing`.

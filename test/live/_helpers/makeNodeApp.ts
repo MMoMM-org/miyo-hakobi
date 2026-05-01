@@ -29,12 +29,26 @@
 // because VaultIo branches on `instanceof TFile` / `instanceof TFolder` — the
 // classes returned by the adapter MUST be those exact constructors for the
 // branches to fire correctly.
+//
+// T4.3 extension — tag-aware metadataCache:
+// `makeNodeApp(vaultRoot, { tagFixtures })` wires both `metadataCache
+// .getFileCache` and the module-level `getAllTags` mock so that ExportRunner
+// tag-rule tests see real, fixture-driven tags for selected vault files.
+// Without fixtures the original null-returning behaviour is preserved (import
+// E2E tests do not exercise tag matching).
 
 import * as fs from "node:fs/promises";
 import * as fsSync from "node:fs";
 import * as path from "node:path";
 import { vi } from "vitest";
-import { App, TFile, TFolder } from "obsidian";
+import {
+	App,
+	TFile,
+	TFolder,
+	getAllTags,
+	type CachedMetadata,
+	type TagCache,
+} from "obsidian";
 
 // ---------------------------------------------------------------------------
 // File handle materialization
@@ -127,6 +141,50 @@ function probeKind(absPath: string): "file" | "folder" | null {
 	}
 }
 
+/**
+ * Build a TFolder for `<vaultRoot>/<vrel>` with `children` populated
+ * recursively from disk (each child is a TFile or another TFolder with its
+ * own populated children). Used by `getAbstractFileByPath` so that
+ * `VaultIo.listFolder({ recursive: true })` can walk the tree via the standard
+ * `node.children` traversal.
+ *
+ * Added in T4.3 (export E2E) so folder-export rules see all descendant files.
+ */
+function buildTFolderWithChildrenSync(
+	vaultRoot: string,
+	vrel: string,
+): TFolder {
+	const tfolder = new TFolder();
+	tfolder.path = vrel;
+	tfolder.name = path.posix.basename(vrel) || vrel;
+	const abs = path.join(vaultRoot, vrel);
+
+	let entries: import("node:fs").Dirent[];
+	try {
+		entries = fsSync.readdirSync(abs, { withFileTypes: true });
+	} catch {
+		// Unreadable directory → leave children empty (caller already verified
+		// the folder exists via probeKind).
+		return tfolder;
+	}
+
+	for (const e of entries) {
+		const childAbs = path.join(abs, e.name);
+		const childRel = vrel === "" ? e.name : `${vrel}/${e.name}`;
+		if (e.isDirectory()) {
+			const childFolder = buildTFolderWithChildrenSync(vaultRoot, childRel);
+			childFolder.parent = tfolder;
+			tfolder.children.push(childFolder);
+		} else if (e.isFile()) {
+			const s = fsSync.statSync(childAbs);
+			const childFile = buildTFile(childRel, e.name, s);
+			childFile.parent = tfolder;
+			tfolder.children.push(childFile);
+		}
+	}
+	return tfolder;
+}
+
 // ---------------------------------------------------------------------------
 // makeNodeApp
 // ---------------------------------------------------------------------------
@@ -137,11 +195,40 @@ export interface NodeApp {
 }
 
 /**
+ * Tag fixtures map: vault-relative note path → array of tags (with leading `#`).
+ *
+ * When supplied, `makeNodeApp` wires `metadataCache.getFileCache` to return a
+ * synthetic CachedMetadata whose `tags` array carries the configured tags, AND
+ * overrides the global `getAllTags` mock to extract those same tags from the
+ * cache. This lets ExportRunner's tag-rule path exercise real ADR-11 nested-
+ * tag matching against a known fixture set without spinning up Obsidian's
+ * actual metadata cache.
+ *
+ * Notes whose path is not present in the map produce `null` from
+ * `getFileCache` (matching real Obsidian behaviour for unindexed files), so
+ * tests can mix tagged and untagged notes in the same vault.
+ *
+ * Added in T4.3 (export E2E) — extension of the T4.2 harness.
+ */
+export type TagFixtures = ReadonlyMap<string, readonly string[]>;
+
+export interface MakeNodeAppOpts {
+	tagFixtures?: TagFixtures;
+}
+
+/**
  * Build an `App`-shaped object whose vault and vault.adapter methods are backed
  * by `node:fs` rooted at `vaultRoot`. The directory at `vaultRoot` MUST exist
  * before the first call.
+ *
+ * If `opts.tagFixtures` is supplied, `metadataCache.getFileCache` and the
+ * module-level `getAllTags` mock are wired to surface the configured tags for
+ * the listed vault-relative note paths.
  */
-export function makeNodeApp(vaultRoot: string): NodeApp {
+export function makeNodeApp(
+	vaultRoot: string,
+	opts: MakeNodeAppOpts = {},
+): NodeApp {
 	const app = new App();
 
 	// Synchronous APIs that sniff disk shape — used by VaultIo on the hot path
@@ -214,10 +301,12 @@ export function makeNodeApp(vaultRoot: string): NodeApp {
 			const s = fsSync.statSync(abs);
 			return buildTFile(vrel, path.posix.basename(vrel), s);
 		}
-		const tfolder = new TFolder();
-		tfolder.path = vrel;
-		tfolder.name = path.posix.basename(vrel) || vrel;
-		return tfolder;
+		// Folder branch: VaultIo.listFolder({ recursive: true }) walks
+		// `node.children` to enumerate descendants, so we materialise the entire
+		// subtree from disk here. Cost is O(n) per call but only invoked when a
+		// folder lookup actually happens (rule resolution path), which is fine
+		// for live tests.
+		return buildTFolderWithChildrenSync(vaultRoot, vrel);
 	});
 
 	vaultAny["getFileByPath"] = vi.fn((vrel: string): TFile | null => {
@@ -290,9 +379,40 @@ export function makeNodeApp(vaultRoot: string): NodeApp {
 		await fs.unlink(abs);
 	});
 
-	// metadataCache.getFileCache: live tests don't exercise tag matching here,
-	// but ExportRunner tag rules would. Default to null cache; callers can
-	// override on the returned `app` if needed.
+	// -------------------------------------------------------------------------
+	// metadataCache + getAllTags wiring (T4.3 — tag-rule export tests)
+	// -------------------------------------------------------------------------
+	// VaultIo.notesByTag does:
+	//   const cache = metadataCache.getFileCache(file);
+	//   const fileTags = getAllTags(cache);  // mock returns null by default
+	// Without intervention, getAllTags returns null for every file and tag rules
+	// match nothing. When `opts.tagFixtures` is provided, we wire BOTH halves of
+	// that pipeline: `getFileCache` returns a synthetic CachedMetadata carrying
+	// the fixture tags as TagCache entries, and `getAllTags` is overridden to
+	// extract those same tags from the cache (mirroring real Obsidian behaviour
+	// of `cache.tags?.map(t => t.tag)`).
+	const tagFixtures = opts.tagFixtures;
+	if (tagFixtures !== undefined) {
+		const metadataCache = app.metadataCache as unknown as Record<string, unknown>;
+		metadataCache["getFileCache"] = vi.fn((file: TFile): CachedMetadata | null => {
+			const tags = tagFixtures.get(file.path);
+			if (tags === undefined) return null;
+			const tagCaches: TagCache[] = tags.map((tag) => ({ tag }));
+			return { tags: tagCaches };
+		});
+
+		// getAllTags is a module-level vi.fn in the obsidian mock. Override its
+		// implementation so VaultIo.notesByTag sees the fixture tags. We do not
+		// reset it on teardown — each test that wants tag matching supplies its
+		// own fixtures via a fresh makeNodeApp() call, and the obsidian module
+		// mock is per-test-file scoped enough for our usage.
+		vi.mocked(getAllTags).mockImplementation((cache): string[] | null => {
+			if (cache === null || cache === undefined) return null;
+			const tags = cache.tags;
+			if (tags === undefined || tags.length === 0) return null;
+			return tags.map((t: TagCache) => t.tag);
+		});
+	}
 
 	return { app, vaultRoot };
 }
