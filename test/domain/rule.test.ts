@@ -377,13 +377,32 @@ describe("assertNever — exhaustiveness", () => {
       if (rule.sourceType === "folder") return "folder";
       if (rule.sourceType === "tag") return "tag";
       if (rule.sourceType === "note") return "note";
-      // @ts-expect-error -- assertNever proves exhaustiveness at compile time
       return assertNever(rule);
     }
 
     const r = validateRule(IMPORT_RAW);
     if (r.ok) {
       expect(describeRule(r.value)).toBe("import");
+    }
+  });
+
+  it("assertNever fails to compile when a variant is unhandled (proven via ts-expect-error)", () => {
+    // This function intentionally omits the "note" branch.
+    // assertNever should fail to compile because rule is not `never` at this point.
+    function incompleteDescribeRule(rule: Rule): string {
+      if (rule.direction === "import") return "import";
+      if (rule.sourceType === "folder") return "folder";
+      if (rule.sourceType === "tag") return "tag";
+      // INTENTIONALLY missing the "note" branch — assertNever should fail to compile
+      // because rule is still ExportNoteRule here, not `never`.
+      // @ts-expect-error -- exhaustiveness violation: ExportNoteRule is not handled
+      return assertNever(rule);
+    }
+
+    // Verify at runtime that the function throws for an unhandled variant.
+    const r = validateRule(EXPORT_NOTE_RAW);
+    if (r.ok) {
+      expect(() => incompleteDescribeRule(r.value)).toThrow();
     }
   });
 
