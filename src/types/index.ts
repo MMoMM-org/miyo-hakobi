@@ -63,13 +63,6 @@ export interface DeviceState {
 	ruleEnablement: Record<RuleId, boolean>;
 }
 
-export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
-	perFileTimeoutMs: 10_000,
-	auditRetentionDays: 90,
-	auditMaxBytes: 10_485_760,
-	stabilityCheckMs: 2_000,
-};
-
 // ---------------------------------------------------------------------------
 // Legacy scaffold types
 //

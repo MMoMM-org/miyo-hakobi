@@ -4,34 +4,20 @@
 // `src/types/index.ts` is the single import surface downstream phases will
 // reach for to get Rule, RuleId, AuditEntry, GlobalSettings, DeviceState
 // and the persisted PluginData shape. These tests keep that surface
-// honest:
-//  - the exported types are still assignable from realistic literals
-//    (the `let _x: T = literal` lines are compile-time assertions),
-//  - DEFAULT_GLOBAL_SETTINGS exposes the documented default values so the
-//    settings UI and the runtime have a single source of truth.
+// honest: the exported types are still assignable from realistic literals
+// (the `const x: T = literal` lines are compile-time assertions).
 
 import { describe, expect, it } from "vitest";
-import {
-	DEFAULT_GLOBAL_SETTINGS,
-	type AuditEntry,
-	type DeviceState,
-	type GlobalSettings,
-	type PluginData,
-	type Rule,
-	type RuleId,
+import type {
+	AuditEntry,
+	DeviceState,
+	GlobalSettings,
+	PluginData,
+	Rule,
+	RuleId,
 } from "../../src/types/index";
 
 describe("src/types/index re-export surface", () => {
-	it("DEFAULT_GLOBAL_SETTINGS exposes the documented defaults", () => {
-		const expected: GlobalSettings = {
-			perFileTimeoutMs: 10_000,
-			auditRetentionDays: 90,
-			auditMaxBytes: 10_485_760,
-			stabilityCheckMs: 2_000,
-		};
-		expect(DEFAULT_GLOBAL_SETTINGS).toEqual(expected);
-	});
-
 	it("re-exports Rule and RuleId so a typed Rule literal is assignable", () => {
 		// Compile-time assertion: if Rule or RuleId are not re-exported with the
 		// expected shape, this file will fail to type-check.
@@ -91,12 +77,18 @@ describe("src/types/index re-export surface", () => {
 	});
 
 	it("exports PluginData composed of Rule[] and GlobalSettings", () => {
+		const globalSettings: GlobalSettings = {
+			perFileTimeoutMs: 10_000,
+			auditRetentionDays: 90,
+			auditMaxBytes: 10_485_760,
+			stabilityCheckMs: 2_000,
+		};
 		const data: PluginData = {
 			schemaVersion: 1,
 			rules: [],
-			globalSettings: DEFAULT_GLOBAL_SETTINGS,
+			globalSettings,
 		};
 		expect(data.rules).toEqual([]);
-		expect(data.globalSettings).toBe(DEFAULT_GLOBAL_SETTINGS);
+		expect(data.globalSettings).toBe(globalSettings);
 	});
 });

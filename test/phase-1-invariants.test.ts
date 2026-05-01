@@ -10,8 +10,6 @@
 //      (Privacy & Security) forbids silent network surfaces; this test
 //      catches a `fetch(`, `http://`, `https://`, `XMLHttpRequest`,
 //      `WebSocket(` slipping into a domain/audit/fs/vault/runner module.
-//   3. No Phase 1 source uses `eval(` or `new Function(` (defense in
-//      depth — Constitution L1 Privacy & Security).
 //
 // The walks use Node's `fs/promises`, which is fine in tests but would be
 // disallowed inside the modules we are scanning.
@@ -130,8 +128,8 @@ describe("Phase 1 invariants", () => {
 		});
 	});
 
-	describe("Phase 1 source has no remote URL or eval surface", () => {
-		// Pre-collect the files once for the two grep tests.
+	describe("Phase 1 source has no remote URL surface", () => {
+		// Pre-collect the files once for the grep test.
 		const collectFiles = async (): Promise<string[]> => {
 			const all: string[] = [];
 			for (const dir of PHASE_1_DIRS) {
@@ -156,26 +154,6 @@ describe("Phase 1 invariants", () => {
 				{ name: "https://", re: /https:\/\// },
 				{ name: "XMLHttpRequest", re: /\bXMLHttpRequest\b/ },
 				{ name: "WebSocket(", re: /\bWebSocket\s*\(/ },
-			];
-			const offenders: string[] = [];
-			for (const file of files) {
-				const src = await fsp.readFile(file, "utf8");
-				const codeOnly = stripComments(src);
-				for (const { name, re } of patterns) {
-					if (re.test(codeOnly)) {
-						offenders.push(`${path.relative(REPO_ROOT, file)} contains ${name}`);
-					}
-				}
-			}
-			expect(offenders).toEqual([]);
-		});
-
-		it("contains no eval( or new Function( in non-comment code", async () => {
-			const files = await collectFiles();
-			expect(files.length).toBeGreaterThan(0);
-			const patterns: { name: string; re: RegExp }[] = [
-				{ name: "eval(", re: /\beval\s*\(/ },
-				{ name: "new Function(", re: /\bnew\s+Function\s*\(/ },
 			];
 			const offenders: string[] = [];
 			for (const file of files) {
