@@ -91,7 +91,7 @@ This phase delivers the pure, Obsidian-free foundation: types, sanitize, scope, 
   5. Success:
      - [ ] No file content / frontmatter / absolute paths can flow through serialize (compile-time guarded by closed types) `[ref: PRD/F5]`
 
-- [ ] **T1.7 NodeFs adapter (with global IO timeout)** `[activity: data-architecture] [parallel: true]`
+- [x] **T1.7 NodeFs adapter (with global IO timeout)** `[activity: data-architecture] [parallel: true]`
 
   1. Prime: `[ref: PRD/F11]`, `[ref: SDD/Cross-Cutting Concepts/Performance]`.
   2. Test: `readFile` / `writeFile` / `lstat` / `rename` / `unlink` / `readdir` / `realpath` / `mkdir` wrappers; each respects the configured `perFileTimeoutMs` via `Promise.race` against a timeout sentinel; on timeout, throws a typed `IoTimeoutError` (errorCode `io-timeout`); cloud-sync placeholder simulation triggers timeout (mock long-running readFile).
