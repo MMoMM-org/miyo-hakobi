@@ -115,7 +115,7 @@ function validateBase(
 
   // everyMinutes: finite number ≥ 1
   const em = obj["everyMinutes"];
-  if (typeof em !== "number" || !isFinite(em) || em < 1) {
+  if (typeof em !== "number" || !Number.isInteger(em) || em < 1) {
     errors.push({ path: "everyMinutes", message: "'everyMinutes' must be a finite number ≥ 1" });
   } else {
     base.everyMinutes = em;
@@ -259,7 +259,7 @@ function validateExportTag(
     tags = [];
     for (let i = 0; i < rawTags.length; i++) {
       const t: unknown = rawTags[i];
-      if (typeof t !== "string" || t.length === 0 || !t.startsWith("#")) {
+      if (typeof t !== "string" || t.length < 2 || !t.startsWith("#")) {
         localErrors.push({
           path: `tags[${i}]`,
           message: `tags[${i}] must be a non-empty string starting with '#'`,

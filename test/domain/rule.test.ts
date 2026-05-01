@@ -72,6 +72,15 @@ describe("validateRule — ImportRule happy path", () => {
       expect(rule.direction).toBe("import");
       expect(rule.sourcePath).toBe("/Users/me/Downloads");
       expect(rule.destinationVaultPath).toBe("Inbox");
+      expect(rule).toMatchObject({
+        id: "550e8400-e29b-41d4-a716-446655440000",
+        name: "My rule",
+        everyMinutes: 5,
+        action: "copy",
+        onCollision: "skip",
+        flattenOnTarget: false,
+        dryRun: false,
+      });
     }
   });
 });
@@ -84,6 +93,15 @@ describe("validateRule — ExportFolderRule happy path", () => {
       const rule = result.value as ExportFolderRule;
       expect(rule.direction).toBe("export");
       expect(rule.sourceType).toBe("folder");
+      expect(rule).toMatchObject({
+        id: "550e8400-e29b-41d4-a716-446655440000",
+        name: "My rule",
+        everyMinutes: 5,
+        action: "copy",
+        onCollision: "skip",
+        flattenOnTarget: false,
+        dryRun: false,
+      });
     }
   });
 });
@@ -97,6 +115,15 @@ describe("validateRule — ExportTagRule happy path", () => {
       expect(rule.sourceType).toBe("tag");
       expect(rule.tags).toEqual(["#projects", "#active"]);
       expect(rule.tagMatch).toBe("any");
+      expect(rule).toMatchObject({
+        id: "550e8400-e29b-41d4-a716-446655440000",
+        name: "My rule",
+        everyMinutes: 5,
+        action: "copy",
+        onCollision: "skip",
+        flattenOnTarget: false,
+        dryRun: false,
+      });
     }
   });
 
@@ -119,6 +146,15 @@ describe("validateRule — ExportNoteRule happy path", () => {
       const rule = result.value as ExportNoteRule;
       expect(rule.sourceType).toBe("note");
       expect(rule.sourceVaultNotePath).toBe("Daily/2026-04-30.md");
+      expect(rule).toMatchObject({
+        id: "550e8400-e29b-41d4-a716-446655440000",
+        name: "My rule",
+        everyMinutes: 5,
+        action: "copy",
+        onCollision: "skip",
+        flattenOnTarget: false,
+        dryRun: false,
+      });
     }
   });
 });
@@ -208,6 +244,13 @@ describe("validateRule — everyMinutes boundaries", () => {
   it("rejects everyMinutes = -1", () => {
     const result = validateRule({ ...IMPORT_RAW, everyMinutes: -1 });
     expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors.some((e) => e.path === "everyMinutes")).toBe(true);
+  });
+
+  it("rejects everyMinutes = 1.5 (integer required)", () => {
+    const result = validateRule({ ...IMPORT_RAW, everyMinutes: 1.5 });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors.some((e) => e.path === "everyMinutes")).toBe(true);
   });
 
   it("accepts everyMinutes = 1", () => {
@@ -261,6 +304,12 @@ describe("validateRule — tag validation", () => {
     if (!result.ok) {
       expect(result.errors.some((e) => e.path === "tagMatch")).toBe(true);
     }
+  });
+
+  it("rejects '#' as a tag (must have content after #)", () => {
+    const result = validateRule({ ...EXPORT_TAG_RAW, tags: ["#"] });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors.some((e) => e.path.startsWith("tags"))).toBe(true);
   });
 });
 
