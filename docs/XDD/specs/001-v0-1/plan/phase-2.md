@@ -1,6 +1,6 @@
 ---
 title: "Phase 2: Engine — Persistence, Scheduler, Runners"
-status: in_progress
+status: completed
 version: "1.0"
 phase: 2
 ---
@@ -66,7 +66,7 @@ This phase delivers the engine that takes rules and turns them into ferry action
   5. Success:
      - [ ] Overlap-skip semantics match `[ref: PRD/F3]` AC: "If a rule's previous run is still in flight, the new tick is skipped."
 
-- [ ] **T2.4 Scheduler** `[activity: backend-api]`
+- [x] **T2.4 Scheduler** `[activity: backend-api]`
 
   Depends on T2.1 (RuleStore), T2.2 (DeviceStore), T2.3 (InFlightRegistry).
 
@@ -78,7 +78,7 @@ This phase delivers the engine that takes rules and turns them into ferry action
      - [ ] Plugin unload leaves zero active timers (asserted via `_runCleanup()`) `[ref: PRD/F3, SDD/Quality Requirements/Reliability]`
      - [ ] Reschedule on `everyMinutes` change without plugin restart `[ref: PRD/F3]`
 
-- [ ] **T2.5 ImportRunner** `[activity: backend-api]`
+- [x] **T2.5 ImportRunner** `[activity: backend-api]`
 
   Depends on T1.9 (AtomicWriter), T1.10 (AuditLog), T2.3 (InFlightRegistry).
 
@@ -91,7 +91,7 @@ This phase delivers the engine that takes rules and turns them into ferry action
      - [ ] Every PRD/F9 run-time criterion covered (symlink, scope, traversal) `[ref: PRD/F9]`
      - [ ] No half-files in destination on simulated mid-write crash `[ref: SDD/BR3]`
 
-- [ ] **T2.6 ExportRunner (folder/tag/note dispatch)** `[activity: backend-api]`
+- [x] **T2.6 ExportRunner (folder/tag/note dispatch)** `[activity: backend-api]`
 
   Depends on T1.8 (VaultIo), T1.9 (AtomicWriter), T1.10 (AuditLog).
 
@@ -104,7 +104,7 @@ This phase delivers the engine that takes rules and turns them into ferry action
      - [ ] Tag-rule recursion matches Obsidian's UI `[ref: SDD/ADR-11]`
      - [ ] mtime preserved on export only `[ref: SDD/ADR-6]`
 
-- [ ] **T2.7 Phase 2 Validation** `[activity: validate]`
+- [x] **T2.7 Phase 2 Validation** `[activity: validate]`
 
   - Run `npm run typecheck && npm test && npm run lint && npm run build`.
   - Confirm `Plugin._runCleanup()` test passes (no leaked timers across the full Phase 2 surface).

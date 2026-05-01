@@ -122,7 +122,7 @@ Each phase is in a separate file. Tasks follow red-green-refactor: **Prime** (un
 > **Tracking Principle**: Track logical units that produce verifiable outcomes. The TDD cycle is the method, not separate tracked items.
 
 - [x] [Phase 1: Domain & Audit Primitives](phase-1.md)
-- [ ] [Phase 2: Engine — Persistence, Scheduler, Runners](phase-2.md)
+- [x] [Phase 2: Engine — Persistence, Scheduler, Runners](phase-2.md)
 - [ ] [Phase 3: UI & Lifecycle Wiring](phase-3.md)
 - [ ] [Phase 4: Integration, E2E, Polish](phase-4.md)
 
