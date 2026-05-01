@@ -137,7 +137,7 @@ export class StatusBar {
 	}
 
 	private buildTooltip(
-		state: State | "failed-sticky",
+		state: State,
 		ruleName?: string,
 		summary?: string,
 	): string {
@@ -149,7 +149,6 @@ export class StatusBar {
 			case "running":
 				return `Hakobi: running '${ruleName}'…`;
 			case "failed":
-			case "failed-sticky":
 				return summary
 					? `Hakobi: failed — ${summary}`
 					: "Hakobi: failed";

@@ -27,7 +27,6 @@ function makeAugmentedEl(): HTMLElement {
 		childTag: string,
 		opts?: { text?: string; cls?: string; attr?: Record<string, string> },
 	): HTMLElement => {
-		const child = makeAugmentedEl();
 		// Swap tag by creating a real element of the right tag type
 		const realChild = document.createElement(childTag) as HTMLElement;
 		// Copy augmented helpers onto it
