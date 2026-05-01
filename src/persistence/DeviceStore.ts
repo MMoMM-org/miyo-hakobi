@@ -100,13 +100,14 @@ export class DeviceStore {
       "deviceId" in parsed &&
       typeof (parsed as Record<string, unknown>).deviceId === "string" &&
       "ruleEnablement" in parsed &&
-      typeof (parsed as Record<string, unknown>).ruleEnablement === "object"
+      typeof (parsed as Record<string, unknown>).ruleEnablement === "object" &&
+      (parsed as Record<string, unknown>).ruleEnablement !== null
     ) {
       const p = parsed as Record<string, unknown>;
       this.cache = {
         schemaVersion: 1,
         deviceId: p.deviceId as string,
-        ruleEnablement: (p.ruleEnablement as Record<RuleId, boolean>) ?? {},
+        ruleEnablement: p.ruleEnablement as Record<RuleId, boolean>,
       };
     } else {
       console.warn(

@@ -19,7 +19,7 @@
 // Adapter strategy: in-memory Map<string, string> fake adapter so all
 // read/write/exists operations round-trip predictably without touching disk.
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { DeviceStore } from "../../src/persistence/DeviceStore";
 import type { DeviceFsAdapter } from "../../src/persistence/DeviceStore";
 import type { RuleId } from "../../src/domain/ruleId";
@@ -57,18 +57,6 @@ const DEVICE_JSON_PATH = `${PLUGIN_DATA_DIR}/device.json`;
 const RULE_ID_A = "aaaaaaaa-0000-0000-0000-000000000001" as RuleId;
 const RULE_ID_B = "bbbbbbbb-0000-0000-0000-000000000002" as RuleId;
 const FIXED_UUID = "11111111-2222-3333-4444-555555555555";
-
-function makeStore(
-  store: Map<string, string>,
-  overrides?: { randomUUID?: () => string },
-): DeviceStore {
-  const { adapter } = { adapter: makeSpy(store) };
-  return new DeviceStore({
-    adapter,
-    pluginDataDir: PLUGIN_DATA_DIR,
-    randomUUID: overrides?.randomUUID ?? (() => FIXED_UUID),
-  });
-}
 
 // Wrap the raw map adapter with vi.fn() spies for call-count assertions.
 function makeSpy(store: Map<string, string>): DeviceFsAdapter {
@@ -400,6 +388,96 @@ describe("DeviceStore — malformed JSON recovery", () => {
     });
 
     await expect(ds.getDeviceId()).resolves.toBe(FIXED_UUID);
+
+    warnSpy.mockRestore();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Read failure after exists returned true (Finding 2)
+// ---------------------------------------------------------------------------
+
+describe("DeviceStore — read failure after exists=true", () => {
+  it("re-inits with a fresh device when read() throws after exists() returns true", async () => {
+    const readError = new Error("disk I/O error");
+    const spy: DeviceFsAdapter = {
+      exists: vi.fn(async (_path: string): Promise<boolean> => true),
+      read: vi.fn(async (_path: string): Promise<string> => { throw readError; }),
+      write: vi.fn(async (_path: string, _data: string): Promise<void> => {}),
+    };
+
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    const ds = new DeviceStore({
+      adapter: spy,
+      pluginDataDir: PLUGIN_DATA_DIR,
+      randomUUID: () => FIXED_UUID,
+    });
+
+    const id = await ds.getDeviceId();
+
+    expect(id).toBe(FIXED_UUID);
+    expect(warnSpy).toHaveBeenCalledOnce();
+    expect(warnSpy.mock.calls[0]![0]).toContain("Failed to read");
+    expect(spy.write).toHaveBeenCalledOnce();
+
+    warnSpy.mockRestore();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Unexpected structure recovery (Finding 3)
+// ---------------------------------------------------------------------------
+
+describe("DeviceStore — unexpected structure recovery", () => {
+  it("re-inits with a fresh device when device.json is valid JSON but lacks required keys", async () => {
+    const { store } = makeAdapter();
+    // Valid JSON, but missing deviceId and ruleEnablement.
+    store.set(DEVICE_JSON_PATH, JSON.stringify({ version: 99 }));
+
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    const ds = new DeviceStore({
+      adapter: makeSpy(store),
+      pluginDataDir: PLUGIN_DATA_DIR,
+      randomUUID: () => FIXED_UUID,
+    });
+
+    const id = await ds.getDeviceId();
+
+    expect(id).toBe(FIXED_UUID);
+    expect(warnSpy).toHaveBeenCalledOnce();
+    expect(warnSpy.mock.calls[0]![0]).toContain("unexpected structure");
+    expect(store.get(DEVICE_JSON_PATH)).toBeDefined();
+    const persisted = JSON.parse(store.get(DEVICE_JSON_PATH)!) as { deviceId: string };
+    expect(persisted.deviceId).toBe(FIXED_UUID);
+
+    warnSpy.mockRestore();
+  });
+
+  it("re-inits (warn + fresh state) when ruleEnablement is null — null is not a valid object (Finding 1 regression)", async () => {
+    const { store } = makeAdapter();
+    // Simulate a Sync-corrupted file where ruleEnablement was set to null.
+    store.set(
+      DEVICE_JSON_PATH,
+      JSON.stringify({ schemaVersion: 1, deviceId: "existing-id", ruleEnablement: null }),
+    );
+
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    const ds = new DeviceStore({
+      adapter: makeSpy(store),
+      pluginDataDir: PLUGIN_DATA_DIR,
+      randomUUID: () => FIXED_UUID,
+    });
+
+    const id = await ds.getDeviceId();
+
+    // Must NOT silently use the existing-id — must re-init.
+    expect(id).toBe(FIXED_UUID);
+    expect(warnSpy).toHaveBeenCalledOnce();
+    // Warning should route through unexpected-structure branch.
+    expect(warnSpy.mock.calls[0]![0]).toContain("unexpected structure");
 
     warnSpy.mockRestore();
   });
