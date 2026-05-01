@@ -80,7 +80,7 @@ This phase glues the engine and UI into observably-correct behavior, hardens the
   5. Success:
      - [x] Documents at least one piece of non-obvious behavior per `[ref: PRD/Risks and Mitigations]` row `[ref: SDD/Implementation Gotchas]`
 
-- [ ] **T4.6 Build / bundle / lint hardening** `[activity: validate]`
+- [x] **T4.6 Build / bundle / lint hardening** `[activity: validate]`
 
   Depends on all prior phases.
 
@@ -89,9 +89,9 @@ This phase glues the engine and UI into observably-correct behavior, hardens the
   3. Implement: any necessary tweaks (eslint disables removed where possible, lint rule additions for the network grep test, bundle size budget enforcement in `package.json` script).
   4. Validate: full pre-commit gate passes — `npm run typecheck && npm test && npm run lint && npm run build`.
   5. Success:
-     - [ ] Bundle ≤ 100 KB `[ref: SDD/Quality Requirements/Performance]`
-     - [ ] Zero lint errors / zero lint warnings `[ref: SDD/CON-10]`
-     - [ ] No network APIs in the bundle (grep-based) `[ref: SDD/CON-1, Constitution L1]`
+     - [x] Bundle ≤ 100 KB `[ref: SDD/Quality Requirements/Performance]`
+     - [x] Zero lint errors / zero lint warnings `[ref: SDD/CON-10]`
+     - [x] No network APIs in the bundle (grep-based) `[ref: SDD/CON-1, Constitution L1]`
 
 - [ ] **T4.7 Spec compliance final sweep** `[activity: validate]`
 
