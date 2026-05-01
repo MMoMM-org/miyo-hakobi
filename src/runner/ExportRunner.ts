@@ -57,8 +57,6 @@ export interface ExportRunnerDeps {
    * full ExportRule.
    */
   validateScope: (rule: ExportRule) => Promise<Result<void, ScopeViolation>>;
-  vaultRoot: string;
-  pluginDir: string;
   nowFn: () => Date;
 }
 
@@ -152,7 +150,7 @@ export class ExportRunner {
     ts: string,
   ): Promise<TFile[] | null> {
     if (rule.sourceType === "folder") {
-      return this.enumerateFolder(rule, ts);
+      return this.enumerateFolder(rule);
     }
     if (rule.sourceType === "tag") {
       return this.enumerateTag(rule);
@@ -165,7 +163,6 @@ export class ExportRunner {
 
   private async enumerateFolder(
     rule: ExportFolderRule,
-    _ts: string,
   ): Promise<TFile[]> {
     try {
       return await this.vaultIo.listFolder(rule.sourceVaultPath, { recursive: true });
@@ -232,12 +229,8 @@ export class ExportRunner {
     // Compute destination sub-path inside destinationPath.
     const destSubPath = computeDestSubPath(rule, sanitized.name, sourceRel);
     const destFull = `${rule.destinationPath}/${destSubPath}`;
-    const destDir = destFull.includes("/")
-      ? destFull.slice(0, destFull.lastIndexOf("/"))
-      : rule.destinationPath;
-    const destBase = destFull.includes("/")
-      ? destFull.slice(destFull.lastIndexOf("/") + 1)
-      : destFull;
+    const destDir = destFull.slice(0, destFull.lastIndexOf("/"));
+    const destBase = destFull.slice(destFull.lastIndexOf("/") + 1);
 
     // Collision detection: check if destFull already exists as a file at the FS destination.
     const destExists = await this.fsFileExists(`${rule.destinationPath}/${destSubPath}`);
@@ -467,12 +460,13 @@ export class ExportRunner {
     ts: string,
     decision: Decision,
   ): AuditEntry {
+    const ruleOperation = rule.action === "move" ? "move" : "copy";
     return {
       timestamp: ts,
       ruleId: rule.id,
       ruleName: rule.name,
       direction: "export",
-      operation: decision === "rule-ok" ? "copy" : "error",
+      operation: decision === "rule-failed" ? "error" : ruleOperation,
       decision,
     };
   }

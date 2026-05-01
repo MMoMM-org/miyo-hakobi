@@ -27,7 +27,6 @@ import { ExportRunner } from "../../src/runner/ExportRunner";
 // ---------------------------------------------------------------------------
 
 const VAULT_ROOT = "/vault";
-const PLUGIN_DIR = "/vault/.obsidian/plugins/miyo-hakobi";
 const DEST_DIR = "/export/dest";
 
 /** Build a stub VaultIo whose methods are individually overrideable. */
@@ -206,8 +205,6 @@ function makeRunner(opts?: {
     nodeFs: fs,
     vaultIo: vault,
     validateScope: scopeValidator,
-    vaultRoot: VAULT_ROOT,
-    pluginDir: PLUGIN_DIR,
     nowFn: () => new Date("2026-05-01T00:00:00.000Z"),
   });
 
@@ -670,5 +667,38 @@ describe("ExportRunner — rule-level summary", () => {
 
     const decisions = audit._entries.map((e) => e.decision);
     expect(decisions).toContain("would-skip");
+  });
+
+  it("rule-partial: rule-level entry carries the rule's operation (not 'error') when some files succeed and some fail", async () => {
+    // Two files: first succeeds, second's readBinary rejects.
+    const fileA = createMockTFile({ path: "Notes/a.md", name: "a.md", stat: { mtime: 1000 } });
+    const fileB = createMockTFile({ path: "Notes/b.md", name: "b.md", stat: { mtime: 2000 } });
+    let readCount = 0;
+    const vault = makeVaultStub({
+      listFolder: async () => [fileA, fileB],
+      readBinary: async () => {
+        readCount += 1;
+        if (readCount >= 2) {
+          throw new Error("simulated read failure");
+        }
+        return new ArrayBuffer(4);
+      },
+    });
+    // Default lstat: no files at destination (no collision), parent exists
+    const fs = makeFsStub();
+    const audit = makeAuditStub();
+
+    // Test with action=move to verify operation reflects the rule (not hardcoded 'copy')
+    const { runner } = makeRunner({ vault, fs, audit });
+    await runner.run(makeFolderRule({ action: "move", onCollision: "suffix" }));
+
+    const last = audit._entries.at(-1);
+    expect(last?.decision).toBe("rule-partial");
+    // The rule-level operation must be "move" (the rule's action), NOT "error"
+    expect(last?.operation).toBe("move");
+
+    const perFileDecisions = audit._entries.slice(0, -1).map((e) => e.decision);
+    expect(perFileDecisions).toContain("ok");
+    expect(perFileDecisions).toContain("error");
   });
 });
