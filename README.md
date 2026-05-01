@@ -36,6 +36,10 @@ npm test          # Run tests
 npm run lint      # Lint
 ```
 
+## Privacy
+
+Hakobi is local-first with no telemetry, no analytics, and no network surfaces. See [PRIVACY.md](PRIVACY.md) for the full privacy contract.
+
 ## License
 
 MIT - see [LICENSE](LICENSE)

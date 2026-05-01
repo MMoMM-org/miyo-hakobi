@@ -116,6 +116,8 @@ Mitigations that are Hakobi's responsibility:
 
 If you treat your audit log as sensitive (e.g. rule names that themselves describe sensitive folder structures), consider naming rules generically.
 
+**No interface with sibling MiYo components.** Hakobi has no programmatic interface with Kado, Tomo, or Hashi (the other MiYo plugins). It cannot invoke their APIs and cannot leverage any access grants those components hold. Per MiYo Constitution **L2 Privacy & Security** ("External integrations [...] must not extend their effective vault access beyond what the gating component allows"), Hakobi is bound by this rule both as a callee (it exposes nothing) and as a non-caller (it imports no sibling). Hakobi reaches outward only to user-configured local filesystem paths declared in its own rules.
+
 ## Permissions and scopes requested
 
 | Scope | Why |
