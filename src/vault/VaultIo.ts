@@ -22,8 +22,8 @@
 //    caller can read `.path` and the consumer-facing types stay structurally
 //    compatible with Obsidian's own surfaces.
 //  - `VaultIoError` carries a closed `kind` discriminator
-//    (`"not-found" | "not-folder" | "not-file"`) so callers can pattern-match
-//    typed failures without parsing strings.
+//    (`"not-found" | "not-folder"`) so callers can pattern-match typed
+//    failures without parsing strings.
 //  - Structurally compatible with `VaultIoScopeAdapter` from
 //    src/domain/scope.ts on the `existsAtVaultPath` shape. `resolveVaultPath`
 //    is added in T1.10 when other consumers need it.
@@ -41,7 +41,7 @@ import {
 // recoverable error (file/folder not found, wrong kind at path).
 // ---------------------------------------------------------------------------
 
-export type VaultIoErrorKind = "not-found" | "not-folder" | "not-file";
+export type VaultIoErrorKind = "not-found" | "not-folder";
 
 export class VaultIoError extends Error {
   public readonly kind: VaultIoErrorKind;
