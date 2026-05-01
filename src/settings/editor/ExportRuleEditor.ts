@@ -337,10 +337,12 @@ export class ExportRuleEditor {
 		renderPickerSection(pickerWrapper);
 
 		// 4. Destination path (FS absolute) + Browse button.
+		let destInputEl: HTMLInputElement | undefined;
 		new Setting(containerEl)
 			.setName("Destination path")
 			.setDesc("Absolute filesystem path where files will be exported.")
 			.addText((text) => {
+				destInputEl = text.inputEl;
 				text
 					.setPlaceholder("/users/me/backup")
 					.setValue(destinationPath)
@@ -355,6 +357,10 @@ export class ExportRuleEditor {
 					const chosen = await this.deps.chooseFsFolder();
 					if (chosen !== undefined) {
 						destinationPath = chosen;
+						if (destInputEl !== undefined) {
+							destInputEl.value = chosen;
+							destInputEl.dispatchEvent(new Event("input"));
+						}
 						refreshSave();
 					}
 				});

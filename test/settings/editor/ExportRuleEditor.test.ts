@@ -72,30 +72,6 @@ function findSelectWithOption(container: HTMLElement, optionValue: string): HTML
 	) as HTMLSelectElement | undefined;
 }
 
-/** Fill in all valid fields for an export folder rule and return them. */
-function fillFolderVariant(container: HTMLElement): {
-	nameInput: HTMLInputElement;
-	sourceInput: HTMLInputElement;
-	destInput: HTMLInputElement;
-	everyInput: HTMLInputElement;
-} {
-	// Find name input (first text input)
-	const allInputs = Array.from(container.querySelectorAll("input[type=text], input:not([type])")) as HTMLInputElement[];
-	// Find the inputs in order: name, source-vault-path, destination-path
-	const nameInput = allInputs[0];
-	const sourceInput = allInputs[1]; // vault folder for folder source type
-	const destInput = allInputs[2];  // destination path
-
-	const everyInput = Array.from(container.querySelectorAll("input[type=number]"))[0] as HTMLInputElement;
-
-	fireInput(nameInput, "My Folder Export");
-	fireInput(sourceInput, "Notes/Projects");
-	fireInput(destInput, "/external/backup");
-	fireInput(everyInput, "60");
-
-	return { nameInput, sourceInput, destInput, everyInput };
-}
-
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
@@ -601,5 +577,79 @@ describe("ExportRuleEditor", () => {
 			el.getAttribute("data-setting-name")?.toLowerCase().includes("flatten"),
 		);
 		expect(flattenSetting, "flattenOnTarget hidden for note in edit mode").toBeUndefined();
+	});
+
+	// -------------------------------------------------------------------------
+	// T15: Browse button updates the destination input element visually
+	// -------------------------------------------------------------------------
+
+	it("T15: Browse button updates destination input value after path is chosen", async () => {
+		const chooseFsFolder = vi.fn(async () => "/users/m/exports");
+		const localDeps = makeDeps({ chooseFsFolder });
+		const editor = new ExportRuleEditor(localDeps);
+		editor.renderForCreate(container, vi.fn());
+
+		// Fill enough fields to be close to valid (folder variant)
+		const allInputs = Array.from(container.querySelectorAll("input[type=text], input:not([type])")) as HTMLInputElement[];
+		const nameInput = allInputs[0];
+		const sourceInput = allInputs[1];
+		const everyInput = Array.from(container.querySelectorAll("input[type=number]"))[0] as HTMLInputElement;
+		fireInput(nameInput, "Browse Test Rule");
+		fireInput(sourceInput, "Notes/Projects");
+		fireInput(everyInput, "30");
+
+		// destination input before Browse
+		const destInput = allInputs[2];
+		expect(destInput.value, "destination input starts empty").toBe("");
+
+		// Click Browse button
+		const browseBtn = findButton(container, "Browse…");
+		expect(browseBtn, "Browse button must exist").toBeDefined();
+		browseBtn!.click();
+
+		// Wait for the async chooseFsFolder promise to resolve
+		await vi.waitFor(() => expect(chooseFsFolder).toHaveBeenCalledOnce());
+
+		// The input element must reflect the chosen path
+		expect(destInput.value, "destination input must show chosen path after Browse").toBe("/users/m/exports");
+
+		// The chosen path must be included in the persisted rule when Save is clicked
+		const saveBtn = findButton(container, "Save")!;
+		expect(saveBtn.disabled, "Save enabled after Browse sets a valid destination").toBe(false);
+		saveBtn.click();
+		await vi.waitFor(() => expect(localDeps.ruleStore.add).toHaveBeenCalled());
+		const addCall = vi.mocked(localDeps.ruleStore.add).mock.calls[0]?.[0] as ExportFolderRule;
+		expect(addCall.destinationPath).toBe("/users/m/exports");
+	});
+
+	// -------------------------------------------------------------------------
+	// T16: Source-type round-trip preserves shared field values
+	// -------------------------------------------------------------------------
+
+	it("T16: switching source-type back to folder preserves name and destination values", () => {
+		const editor = new ExportRuleEditor(deps);
+		editor.renderForCreate(container, vi.fn());
+
+		// Fill in shared fields while on folder source type
+		const allInputs = Array.from(container.querySelectorAll("input[type=text], input:not([type])")) as HTMLInputElement[];
+		const nameInput = allInputs[0];
+		const destInput = allInputs[2]; // index 0=name, 1=sourceVaultPath, 2=dest
+		fireInput(nameInput, "My export");
+		fireInput(destInput, "/exports/foo");
+
+		// Switch source type to note
+		const sourceTypeSelect = findSelectWithOption(container, "folder")!;
+		fireChange(sourceTypeSelect, "note");
+
+		// Switch back to folder
+		fireChange(sourceTypeSelect, "folder");
+
+		// The shared form elements are re-queried after re-render of picker section
+		const allInputsAfter = Array.from(container.querySelectorAll("input[type=text], input:not([type])")) as HTMLInputElement[];
+		const nameInputAfter = allInputsAfter[0];
+		const destInputAfter = allInputsAfter[2]; // same position: name, sourceVaultPath, dest
+
+		expect(nameInputAfter.value, "name input preserves value after source-type round-trip").toBe("My export");
+		expect(destInputAfter.value, "destination input preserves value after source-type round-trip").toBe("/exports/foo");
 	});
 });
