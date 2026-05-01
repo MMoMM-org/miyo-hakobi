@@ -480,4 +480,112 @@ describe("ImportSubtab", () => {
 		expect(text).toContain("suffix");
 		expect(text).toContain("flatten");
 	});
+
+	// -------------------------------------------------------------------------
+	// 12. Populated state: Add button calls importRuleEditor.renderForCreate
+	// -------------------------------------------------------------------------
+	it("populated-state '+ add import rule' button calls importRuleEditor.renderForCreate", async () => {
+		const rule = makeImportRule();
+		const deps = makeDeps({
+			ruleStore: {
+				load: vi.fn(async () => ({ rules: [rule] as Rule[] })),
+				remove: vi.fn(async () => [] as Rule[]),
+			},
+		});
+
+		const subtab = new ImportSubtab(deps);
+		subtab.render(containerEl);
+		await flush();
+
+		// The populated path renders a "+ add import rule" button at the top.
+		const addBtn = Array.from(containerEl.querySelectorAll("button")).find(
+			(b) => b.textContent?.includes("add import rule"),
+		)!;
+		expect(addBtn).toBeDefined();
+		addBtn.click();
+
+		expect(deps.importRuleEditor.renderForCreate).toHaveBeenCalledOnce();
+	});
+
+	// -------------------------------------------------------------------------
+	// 13. dryRun: true → "dry-run" badge is rendered in the rule row
+	// -------------------------------------------------------------------------
+	it("renders 'dry-run' badge when rule.dryRun is true", async () => {
+		const rule = makeImportRule({ dryRun: true });
+		const deps = makeDeps({
+			ruleStore: {
+				load: vi.fn(async () => ({ rules: [rule] as Rule[] })),
+				remove: vi.fn(async () => [] as Rule[]),
+			},
+		});
+
+		const subtab = new ImportSubtab(deps);
+		subtab.render(containerEl);
+		await flush();
+
+		const text = containerEl.textContent ?? "";
+		expect(text).toContain("dry-run");
+	});
+
+	// -------------------------------------------------------------------------
+	// 14. notices.transient called on "Run now"
+	// -------------------------------------------------------------------------
+	it("overflow 'Run now' calls notices.transient with /Running rule/i message", async () => {
+		const rule = makeImportRule();
+		const deps = makeDeps({
+			ruleStore: {
+				load: vi.fn(async () => ({ rules: [rule] as Rule[] })),
+				remove: vi.fn(async () => [] as Rule[]),
+			},
+		});
+
+		const subtab = new ImportSubtab(deps);
+		subtab.render(containerEl);
+		await flush();
+
+		const overflowBtn = containerEl.querySelector<HTMLButtonElement>(
+			'button[data-action="overflow"]',
+		)!;
+		overflowBtn.click();
+
+		clickOverflowItem(
+			deps.openOverflowMenu as MockedFunction<ImportSubtabDeps["openOverflowMenu"]>,
+			"Run now",
+		);
+		await flush();
+
+		expect(deps.notices.transient).toHaveBeenCalledOnce();
+		expect((deps.notices.transient as MockedFunction<typeof deps.notices.transient>).mock.calls[0][0]).toMatch(/Running rule/i);
+	});
+
+	// -------------------------------------------------------------------------
+	// 15. notices.transient called on "Run dry-run"
+	// -------------------------------------------------------------------------
+	it("overflow 'Run dry-run' calls notices.transient with /Dry-running rule/i message", async () => {
+		const rule = makeImportRule();
+		const deps = makeDeps({
+			ruleStore: {
+				load: vi.fn(async () => ({ rules: [rule] as Rule[] })),
+				remove: vi.fn(async () => [] as Rule[]),
+			},
+		});
+
+		const subtab = new ImportSubtab(deps);
+		subtab.render(containerEl);
+		await flush();
+
+		const overflowBtn = containerEl.querySelector<HTMLButtonElement>(
+			'button[data-action="overflow"]',
+		)!;
+		overflowBtn.click();
+
+		clickOverflowItem(
+			deps.openOverflowMenu as MockedFunction<ImportSubtabDeps["openOverflowMenu"]>,
+			"Run dry-run",
+		);
+		await flush();
+
+		expect(deps.notices.transient).toHaveBeenCalledOnce();
+		expect((deps.notices.transient as MockedFunction<typeof deps.notices.transient>).mock.calls[0][0]).toMatch(/Dry-running rule/i);
+	});
 });
