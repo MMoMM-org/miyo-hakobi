@@ -9,7 +9,7 @@ import { describe, it, expect } from "vitest";
 import {
   expandUserPath,
   normalizeFsPath,
-  assertNoTraversal,
+  containsTraversal,
   PATH_MAX_BYTES,
 } from "../../src/fs/PathSafe";
 
@@ -145,6 +145,20 @@ describe("expandUserPath", () => {
     expect(result.ok).toBe(true);
   });
 
+  it("rejects expansion that exceeds PATH_MAX_BYTES even if input is short", () => {
+    // A short input (`~/x`, 3 bytes) can still balloon past PATH_MAX_BYTES
+    // once HOME is substituted in. We deliberately size HOME so that the
+    // expanded path crosses 4096 bytes — the input-stage cap alone would
+    // not have caught this.
+    const longHome = "/" + "a".repeat(PATH_MAX_BYTES);
+    const result = expandUserPath("~/x", envFrom({ HOME: longHome }));
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.reason).toBe("too-long");
+      expect((result.error as { bytes: number }).bytes).toBeGreaterThan(PATH_MAX_BYTES);
+    }
+  });
+
   it("falls back to process.env when no env reader is injected (default path)", () => {
     // Drives the default `defaultEnv` lookup against the host's real env.
     // This test runs under vitest+jsdom where `process.env.HOME` is set.
@@ -197,49 +211,49 @@ describe("normalizeFsPath", () => {
     expect(normalizeFsPath("")).toBe("");
   });
 
-  it("throws PathSafeError when input contains a NUL byte", () => {
+  it("throws PathSafeException when input contains a NUL byte", () => {
     // We chose throw over Result here because NUL in a path is a programmer/
     // user-input integrity error that should surface as an exception at the
     // call site — not a domain decision the caller should branch on.
     expect(() => normalizeFsPath("/foo\0/bar")).toThrow(/nul-byte/);
   });
 
-  it("throws PathSafeError when input byte length exceeds PATH_MAX_BYTES", () => {
+  it("throws PathSafeException when input byte length exceeds PATH_MAX_BYTES", () => {
     const long = "/" + "a".repeat(PATH_MAX_BYTES);
     expect(() => normalizeFsPath(long)).toThrow(/too-long/);
   });
 });
 
 // ---------------------------------------------------------------------------
-// assertNoTraversal
+// containsTraversal
 // ---------------------------------------------------------------------------
 
-describe("assertNoTraversal", () => {
-  it("returns true for a path with no `..` segments", () => {
-    expect(assertNoTraversal("/foo/bar/baz")).toBe(true);
+describe("containsTraversal", () => {
+  it("returns false for a path with no `..` segments", () => {
+    expect(containsTraversal("/foo/bar/baz")).toBe(false);
   });
 
-  it("returns false when any segment is exactly `..`", () => {
-    expect(assertNoTraversal("/foo/../bar")).toBe(false);
+  it("returns true when any segment is exactly `..`", () => {
+    expect(containsTraversal("/foo/../bar")).toBe(true);
   });
 
-  it("returns false for a leading `..`", () => {
-    expect(assertNoTraversal("../escape")).toBe(false);
+  it("returns true for a leading `..`", () => {
+    expect(containsTraversal("../escape")).toBe(true);
   });
 
-  it("splits on both `/` AND `\\` so backslash-traversal is rejected", () => {
-    expect(assertNoTraversal("foo\\..\\bar")).toBe(false);
+  it("splits on both `/` AND `\\` so backslash-traversal is detected", () => {
+    expect(containsTraversal("foo\\..\\bar")).toBe(true);
   });
 
-  it("distinguishes `..` (rejected) from `....` (allowed)", () => {
-    expect(assertNoTraversal("/foo/..../bar")).toBe(true);
+  it("distinguishes `..` (detected) from `....` (allowed)", () => {
+    expect(containsTraversal("/foo/..../bar")).toBe(false);
   });
 
-  it("distinguishes `..` (rejected) from `..foo` (allowed — segment-exact match)", () => {
-    expect(assertNoTraversal("/foo/..foo/bar")).toBe(true);
+  it("distinguishes `..` (detected) from `..foo` (allowed — segment-exact match)", () => {
+    expect(containsTraversal("/foo/..foo/bar")).toBe(false);
   });
 
-  it("returns true (vacuously) for empty input", () => {
-    expect(assertNoTraversal("")).toBe(true);
+  it("returns false (vacuously) for empty input", () => {
+    expect(containsTraversal("")).toBe(false);
   });
 });

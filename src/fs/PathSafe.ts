@@ -45,8 +45,7 @@ export type PathSafeError =
   | { reason: "unresolved-env-var"; varName: string }
   | { reason: "nul-byte" }
   | { reason: "too-long"; bytes: number }
-  | { reason: "not-absolute" }
-  | { reason: "traversal"; segment: string };
+  | { reason: "not-absolute" };
 
 /** Single-failure Result for PathSafe. (See note in file header.) */
 export type PathSafeResult<T> =
@@ -159,7 +158,16 @@ export function expandUserPath(
     expanded = expanded.replace(/%USERPROFILE%/gi, userProfile);
   }
 
-  // 4. Result must be absolute (ADR-5: persist *resolved absolute path*).
+  // 4. Re-check the byte-length cap *after* expansion. A short input like
+  //    `~/x` can balloon past PATH_MAX_BYTES once HOME is substituted in
+  //    (e.g. a malformed HOME of 4000+ bytes). Catch that here so callers
+  //    never receive an over-cap path that passed the input-stage check.
+  const expandedBytes = byteLength(expanded);
+  if (expandedBytes > PATH_MAX_BYTES) {
+    return failure({ reason: "too-long", bytes: expandedBytes });
+  }
+
+  // 5. Result must be absolute (ADR-5: persist *resolved absolute path*).
   if (!isAbsolute(expanded)) {
     return failure({ reason: "not-absolute" });
   }
@@ -206,19 +214,22 @@ export function normalizeFsPath(input: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// assertNoTraversal
+// containsTraversal
 // ---------------------------------------------------------------------------
 
 /**
- * True iff `input` contains no `..` traversal segment after splitting on both
- * `/` and `\`. Empty input returns true vacuously. The check is segment-exact:
- * `....` and `..foo` are allowed, only the literal `..` segment is rejected.
+ * True iff `input` contains a `..` traversal segment after splitting on both
+ * `/` and `\`. Empty input returns false vacuously. The check is segment-exact:
+ * `....` and `..foo` are allowed, only the literal `..` segment is detected.
+ *
+ * Naming note: `true` means UNSAFE (a traversal segment was found). Callers
+ * typically reject the path when this returns `true`.
  */
-export function assertNoTraversal(input: string): boolean {
-  if (input === "") return true;
+export function containsTraversal(input: string): boolean {
+  if (input === "") return false;
   const segments = input.split(/[/\\]/);
   for (const seg of segments) {
-    if (seg === "..") return false;
+    if (seg === "..") return true;
   }
-  return true;
+  return false;
 }
