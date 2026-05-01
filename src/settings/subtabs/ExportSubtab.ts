@@ -220,12 +220,14 @@ export class ExportSubtab {
 				{
 					label: "Run now",
 					onClick: () => {
+						this.deps.notices.transient(`Running rule '${rule.name}'…`);
 						void this.deps.scheduler.runOnce(rule.id, { dryRun: false });
 					},
 				},
 				{
 					label: "Run dry-run",
 					onClick: () => {
+						this.deps.notices.transient(`Dry-running rule '${rule.name}'…`);
 						void this.deps.scheduler.runOnce(rule.id, { dryRun: true });
 					},
 				},

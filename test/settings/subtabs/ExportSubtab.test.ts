@@ -327,7 +327,7 @@ describe("ExportSubtab", () => {
 	// Test 9: Overflow Run now → scheduler.runOnce(id, { dryRun: false })
 	// -------------------------------------------------------------------------
 
-	it("overflow Run now: calls scheduler.runOnce(id, { dryRun: false })", async () => {
+	it("overflow Run now: calls scheduler.runOnce(id, { dryRun: false }) and fires transient notice", async () => {
 		const deps = makeDeps({ rules: [FOLDER_RULE] });
 		const subtab = new ExportSubtab(deps);
 		subtab.render(containerEl);
@@ -347,13 +347,14 @@ describe("ExportSubtab", () => {
 
 		expect(deps.scheduler.runOnce).toHaveBeenCalledOnce();
 		expect(deps.scheduler.runOnce).toHaveBeenCalledWith(FOLDER_RULE.id, { dryRun: false });
+		expect(deps.notices.transient).toHaveBeenCalledWith(`Running rule '${FOLDER_RULE.name}'…`);
 	});
 
 	// -------------------------------------------------------------------------
 	// Test 10: Overflow Run dry-run → scheduler.runOnce(id, { dryRun: true })
 	// -------------------------------------------------------------------------
 
-	it("overflow Run dry-run: calls scheduler.runOnce(id, { dryRun: true })", async () => {
+	it("overflow Run dry-run: calls scheduler.runOnce(id, { dryRun: true }) and fires transient notice", async () => {
 		const deps = makeDeps({ rules: [FOLDER_RULE] });
 		const subtab = new ExportSubtab(deps);
 		subtab.render(containerEl);
@@ -371,6 +372,7 @@ describe("ExportSubtab", () => {
 
 		expect(deps.scheduler.runOnce).toHaveBeenCalledOnce();
 		expect(deps.scheduler.runOnce).toHaveBeenCalledWith(FOLDER_RULE.id, { dryRun: true });
+		expect(deps.notices.transient).toHaveBeenCalledWith(`Dry-running rule '${FOLDER_RULE.name}'…`);
 	});
 
 	// -------------------------------------------------------------------------
@@ -462,5 +464,27 @@ describe("ExportSubtab", () => {
 		expect(text).not.toContain("My Import Rule");
 		// Export rule name must appear
 		expect(text).toContain("My Folder Export");
+	});
+
+	// -------------------------------------------------------------------------
+	// Test 15: async isEnabled path — toggle reflects Promise<boolean> result
+	// -------------------------------------------------------------------------
+
+	it("toggle async: reflects deviceStore.isEnabled when it returns a Promise", async () => {
+		const deps = makeDeps({ rules: [FOLDER_RULE] });
+		// Override isEnabled to return a Promise<boolean> instead of a sync boolean
+		deps.deviceStore.isEnabled = vi.fn((_id: RuleId) => Promise.resolve(true));
+
+		const subtab = new ExportSubtab(deps);
+		subtab.render(containerEl);
+
+		// First flush: drains _renderAsync (ruleStore.load + _paint)
+		await flushMicrotasks();
+		// Second flush: drains the .then() callback after isEnabled Promise resolves
+		await flushMicrotasks();
+
+		const toggleEl = containerEl.querySelector("[role='switch']");
+		expect(toggleEl).not.toBeNull();
+		expect(toggleEl!.getAttribute("aria-checked")).toBe("true");
 	});
 });
