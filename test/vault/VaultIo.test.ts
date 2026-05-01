@@ -41,7 +41,7 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("VaultIo — construction", () => {
-	it("exposes the seven required methods", () => {
+	it("exposes the nine required methods", () => {
 		const app = new App();
 		const io = new VaultIo(app);
 		expect(typeof io.readBinary).toBe("function");
@@ -51,6 +51,8 @@ describe("VaultIo — construction", () => {
 		expect(typeof io.notesByTag).toBe("function");
 		expect(typeof io.getActiveFile).toBe("function");
 		expect(typeof io.ensureFolder).toBe("function");
+		expect(typeof io.renameInVault).toBe("function");
+		expect(typeof io.removeInVault).toBe("function");
 	});
 });
 
@@ -414,5 +416,56 @@ describe("VaultIo — ensureFolder", () => {
 			expect((e as VaultIoError).kind).toBe("not-folder");
 		}
 		expect(app.vault.createFolder).not.toHaveBeenCalled();
+	});
+});
+
+// ---------------------------------------------------------------------------
+// renameInVault — thin pass-through to vault.adapter.rename (used by AtomicWriter)
+// ---------------------------------------------------------------------------
+
+describe("VaultIo — renameInVault", () => {
+	it("delegates to app.vault.adapter.rename(from, to)", async () => {
+		const app = new App();
+		const io = new VaultIo(app);
+		await io.renameInVault("Inbox/note.md.tmp.abc", "Inbox/note.md");
+
+		expect(app.vault.adapter.rename).toHaveBeenCalledTimes(1);
+		expect(app.vault.adapter.rename).toHaveBeenCalledWith(
+			"Inbox/note.md.tmp.abc",
+			"Inbox/note.md",
+		);
+	});
+
+	it("propagates errors from the adapter", async () => {
+		const app = new App();
+		const boom = new Error("rename failed");
+		vi.mocked(app.vault.adapter.rename).mockRejectedValueOnce(boom);
+		const io = new VaultIo(app);
+
+		await expect(io.renameInVault("a", "b")).rejects.toBe(boom);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// removeInVault — thin pass-through to vault.adapter.remove (used by AtomicWriter)
+// ---------------------------------------------------------------------------
+
+describe("VaultIo — removeInVault", () => {
+	it("delegates to app.vault.adapter.remove(path)", async () => {
+		const app = new App();
+		const io = new VaultIo(app);
+		await io.removeInVault("Inbox/note.md.tmp.abc");
+
+		expect(app.vault.adapter.remove).toHaveBeenCalledTimes(1);
+		expect(app.vault.adapter.remove).toHaveBeenCalledWith("Inbox/note.md.tmp.abc");
+	});
+
+	it("propagates errors from the adapter", async () => {
+		const app = new App();
+		const boom = new Error("remove failed");
+		vi.mocked(app.vault.adapter.remove).mockRejectedValueOnce(boom);
+		const io = new VaultIo(app);
+
+		await expect(io.removeInVault("Inbox/x.tmp")).rejects.toBe(boom);
 	});
 });

@@ -197,4 +197,27 @@ export class VaultIo {
     // Path exists but is not a folder.
     throw new VaultIoError("not-folder", path);
   }
+
+  /**
+   * Rename a vault path. Thin pass-through to `app.vault.adapter.rename` —
+   * required by AtomicWriter (T1.9) for the temp-then-rename pattern, where
+   * the source path is a sibling temp file with no corresponding TFile entry
+   * in the high-level Vault API. We accept the documented (and Sync-aware)
+   * caveat that adapter-level rename does not refresh the metadata cache as
+   * eagerly as `app.fileManager.renameFile`; for tmp-files in the atomic
+   * write path that's the desired behaviour — they are never indexed.
+   */
+  async renameInVault(from: string, to: string): Promise<void> {
+    await this.app.vault.adapter.rename(from, to);
+  }
+
+  /**
+   * Remove a vault path. Thin pass-through to `app.vault.adapter.remove` —
+   * used by AtomicWriter (T1.9) for best-effort cleanup of temp files when
+   * an atomic write fails part-way. Same rationale as `renameInVault` for
+   * not going through the high-level API: the temp file has no TFile.
+   */
+  async removeInVault(path: string): Promise<void> {
+    await this.app.vault.adapter.remove(path);
+  }
 }

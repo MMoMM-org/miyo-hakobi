@@ -111,7 +111,7 @@ This phase delivers the pure, Obsidian-free foundation: types, sanitize, scope, 
      - [x] No raw `fs` import anywhere in `VaultIo.ts` `[ref: SDD/Solution Strategy]`
      - [x] Tag-rule recursion (nested tags) implemented per ADR-11 `[ref: SDD/ADR-11]`
 
-- [ ] **T1.9 Atomic writer** `[activity: data-architecture]`
+- [x] **T1.9 Atomic writer** `[activity: data-architecture]`
 
   Depends on T1.7 (NodeFs) and T1.8 (VaultIo).
 
@@ -120,8 +120,8 @@ This phase delivers the pure, Obsidian-free foundation: types, sanitize, scope, 
   3. Implement: `src/runner/AtomicWriter.ts` — pure-ish helpers parameterized by `(NodeFs | VaultIo)`. `resolveCollisionName` is fully pure; `writeFsAtomic` / `writeVaultAtomic` are async.
   4. Validate: lint + typecheck.
   5. Success:
-     - [ ] No half-files in destination on simulated mid-write failure (asserted via mock injection) `[ref: SDD/BR3]`
-     - [ ] Collision suffix algorithm matches the SDD walkthrough byte-for-byte `[ref: SDD/Implementation Examples]`
+     - [x] No half-files in destination on simulated mid-write failure (asserted via mock injection) `[ref: SDD/BR3]`
+     - [x] Collision suffix algorithm matches the SDD walkthrough byte-for-byte `[ref: SDD/Implementation Examples]`
 
 - [ ] **T1.10 AuditLog + Rotation** `[activity: data-architecture]`
 
