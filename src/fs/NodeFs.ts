@@ -128,11 +128,19 @@ export class IoUnknownError extends IoError {
 /**
  * Subset of Node's `fs.Stats` that NodeFs publicly exposes through `lstat`.
  * Structurally compatible with `FsScopeAdapter['lstat']` from src/domain/scope.ts.
+ *
+ * `mtimeMs` and `size` are exposed (alongside the boolean shape probes) so
+ * Rotation (T1.10) can compute file age and current size for retention/size
+ * caps without a second stat-style API. Both fields are present on the real
+ * `fs.Stats` object returned by `fsp.lstat`; declaring them here just lets
+ * structurally-typed callers see them.
  */
 export interface LStatResult {
   isSymbolicLink(): boolean;
   isDirectory(): boolean;
   isFile(): boolean;
+  mtimeMs: number;
+  size: number;
 }
 
 export interface NodeFsOptions {

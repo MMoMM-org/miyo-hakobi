@@ -102,6 +102,18 @@ const fileRejected: AuditEntry = {
   errorCode: "symlink-refused",
 };
 
+// Sentinel entry written by AuditLog.purgeAll (T1.10). Uses the dedicated
+// "purged-by-user" decision value added to the closed allowlist alongside
+// T1.10. Direction/operation are placeholders — purge is not a rule action.
+const purgeSentinel: AuditEntry = {
+  timestamp: "2026-05-01T12:05:00.000Z",
+  ruleId: "00000000-0000-0000-0000-000000000000" as RuleId,
+  ruleName: "Hakobi audit purge",
+  direction: "import",
+  operation: "skipped",
+  decision: "purged-by-user",
+};
+
 // ---------------------------------------------------------------------------
 // AuditEntry shape — compile-time assertions
 // ---------------------------------------------------------------------------
@@ -468,6 +480,7 @@ describe("Round-trip serialize → parse", () => {
     { name: "per-file ok with bytes + duration", entry: fileOk },
     { name: "per-file would-write (dry-run)", entry: fileWouldWrite },
     { name: "per-file rejected export (symlink-refused, source path only)", entry: fileRejected },
+    { name: "purge sentinel (decision: purged-by-user)", entry: purgeSentinel },
   ];
 
   for (const { name, entry } of cases) {

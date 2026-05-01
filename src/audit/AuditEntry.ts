@@ -81,6 +81,11 @@ export const DECISION_VALUES = [
   "rule-ok",
   "rule-failed",
   "rule-partial",
+  // "purged-by-user" is reserved for the single sentinel entry the AuditLog
+  // writes after purgeAll() empties the audit directory (T1.10, PRD/F5). It is
+  // *not* produced by any rule execution; the closed-allowlist parser still
+  // accepts it on read so the purge sentinel round-trips through the log.
+  "purged-by-user",
 ] as const;
 export type Decision = (typeof DECISION_VALUES)[number];
 
