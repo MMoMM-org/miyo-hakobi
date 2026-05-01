@@ -78,23 +78,10 @@ function emptyEl(el: HTMLElement): void {
 // HakobiSettingsTab
 // ---------------------------------------------------------------------------
 
-// No-op deps used when main.ts (T3.11 placeholder) constructs SettingsTab with
-// only 2 args. T3.11 will wire the real deps; remove once T3.11 ships.
-const DEFAULT_DEPS: SettingsTabDeps = {
-	headerSection: { render: () => {} },
-	generalSubtab: { render: () => {} },
-	importSubtab: { render: () => {} },
-	exportSubtab: { render: () => {} },
-};
-
-// Backward-compat alias — main.ts (T3.11 placeholder) still imports SettingsTab;
-// T3.11 will rewrite that import. Remove this alias once T3.11 ships.
-export { HakobiSettingsTab as SettingsTab };
-
 export class HakobiSettingsTab extends PluginSettingTab {
 	private readonly deps: SettingsTabDeps;
 
-	constructor(app: App, plugin: Plugin, deps: SettingsTabDeps = DEFAULT_DEPS) {
+	constructor(app: App, plugin: Plugin, deps: SettingsTabDeps) {
 		super(app, plugin);
 		this.deps = deps;
 	}

@@ -63,20 +63,3 @@ export interface DeviceState {
 	ruleEnablement: Record<RuleId, boolean>;
 }
 
-// ---------------------------------------------------------------------------
-// Legacy scaffold types
-//
-// `PluginSettings` / `DEFAULT_SETTINGS` are the original esbuild-template
-// scaffold types still referenced by `src/main.ts` and `src/settings/SettingsTab.ts`.
-// Phase 3 will rewire main.ts onto `PluginData` / `GlobalSettings` and remove
-// these. Kept here as compatibility aliases so T1.11 does not bleed into
-// Phase 3 scope.
-// ---------------------------------------------------------------------------
-
-export interface PluginSettings {
-	exampleSetting: string;
-}
-
-export const DEFAULT_SETTINGS: PluginSettings = {
-	exampleSetting: "default",
-};

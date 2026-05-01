@@ -1,6 +1,6 @@
 ---
 title: "Phase 3: UI & Lifecycle Wiring"
-status: pending
+status: in_progress
 version: "1.0"
 phase: 3
 ---
@@ -35,7 +35,7 @@ phase: 3
 
 This phase delivers all user-visible surfaces and the `main.ts` lifecycle wiring that ties everything together. Subtab and editor tasks can run in parallel; the SettingsTab orchestrator and `main.ts` rewire come last.
 
-- [ ] **T3.1 Notices helper** `[activity: frontend-ui] [parallel: true]`
+- [x] **T3.1 Notices helper** `[activity: frontend-ui] [parallel: true]`
 
   1. Prime: `[ref: SDD/Cross-Cutting Concepts/User Interface & UX/Interaction Design]`.
   2. Test: `transient(message)` creates a Notice with default timeout; `persistent(message)` creates one with `timeout: 0`; `noActiveNote()` shows the canonical "No active note" message; `ruleAlreadyRunning(name)` shows the canonical "Rule already running" message.
@@ -44,7 +44,7 @@ This phase delivers all user-visible surfaces and the `main.ts` lifecycle wiring
   5. Success:
      - [ ] Notice text is centralized in this module (no inline `new Notice(...)` elsewhere — grep test) `[ref: SDD/Cross-Cutting Concepts]`
 
-- [ ] **T3.2 StatusBar** `[activity: frontend-ui] [parallel: true]`
+- [x] **T3.2 StatusBar** `[activity: frontend-ui] [parallel: true]`
 
   1. Prime: `[ref: PRD/F10]`, `[ref: SDD/UI Visualization Guide; status bar three states]`, `[ref: SDD/State machine]`.
   2. Test: render produces a single status-bar element containing kanji `運`; state transitions (idle → running → idle/failed → next-running → idle); color class changes per state (`mod-idle` / `mod-running` / `mod-failed` or equivalent token names); tooltip text matches the SDD examples; `aria-label` matches tooltip; click handler invokes `openSettings('general')`; failed state persists until next successful run OR user click.
@@ -54,7 +54,7 @@ This phase delivers all user-visible surfaces and the `main.ts` lifecycle wiring
      - [ ] All F10 criteria covered by tests `[ref: PRD/F10]`
      - [ ] Click target = General subtab `[ref: PRD/F10 reviewed AC]`
 
-- [ ] **T3.3 CommandRegistry (7 commands)** `[activity: frontend-ui] [parallel: true]`
+- [x] **T3.3 CommandRegistry (7 commands)** `[activity: frontend-ui] [parallel: true]`
 
   Depends on T2.4 (Scheduler) for action wiring (test stubs OK in this phase).
 
@@ -66,7 +66,7 @@ This phase delivers all user-visible surfaces and the `main.ts` lifecycle wiring
      - [ ] All 7 commands match `[ref: PRD/F7]` AC
      - [ ] No double-prefix in command name (review-time invariant from PRD note)
 
-- [ ] **T3.4 HeaderSection** `[activity: frontend-ui] [parallel: true]`
+- [x] **T3.4 HeaderSection** `[activity: frontend-ui] [parallel: true]`
 
   1. Prime: `[ref: SDD/UI Visualization Guide; settings tab empty state]`, `manifest.json`, `[ref: SDD/ADR-10]`.
   2. Test: renders plugin name and tagline from `manifest.name` / `manifest.description`; renders `manifest.author` (mmomm.org) as a link; renders GitHub repo link (hardcoded `https://github.com/MMoMM-org/miyo-hakobi`); renders all `manifest.fundingUrl` entries as links (Buy Me a Coffee + GitHub Sponsors); links open in new tab/external browser (Obsidian default for `<a>` with `external-link` class); no link uses `innerHTML` (Obsidian plugin guideline).
@@ -75,7 +75,7 @@ This phase delivers all user-visible surfaces and the `main.ts` lifecycle wiring
   5. Success:
      - [ ] All header text/URLs sourced from `manifest.json` (no hard-coded plugin name/tagline) `[ref: SDD/ADR-10]`
 
-- [ ] **T3.5 GeneralSubtab** `[activity: frontend-ui] [parallel: true]`
+- [x] **T3.5 GeneralSubtab** `[activity: frontend-ui] [parallel: true]`
 
   Depends on T3.1 (Notices) and conceptually on T1.10 (AuditLog) for the "Show audit log" button wiring.
 
@@ -87,7 +87,7 @@ This phase delivers all user-visible surfaces and the `main.ts` lifecycle wiring
      - [ ] All F6 acceptance criteria covered `[ref: PRD/F6]`
      - [ ] Global IO timeout default is 10000 and persists `[ref: PRD/F11]`
 
-- [ ] **T3.6 ImportRuleEditor (inline)** `[activity: frontend-ui] [parallel: true]`
+- [x] **T3.6 ImportRuleEditor (inline)** `[activity: frontend-ui] [parallel: true]`
 
   Depends on T1.4 (rule schema), T1.5 (PathSafe), T1.2 (scope), T2.1 (RuleStore).
 
@@ -99,7 +99,7 @@ This phase delivers all user-visible surfaces and the `main.ts` lifecycle wiring
      - [ ] Save-blocked-on-invalid invariant covered `[ref: PRD/F9 save-time]`
      - [ ] Loop / forbidden-path detection at save time `[ref: SDD/F9]`
 
-- [ ] **T3.7 ExportRuleEditor (inline)** `[activity: frontend-ui] [parallel: true]`
+- [x] **T3.7 ExportRuleEditor (inline)** `[activity: frontend-ui] [parallel: true]`
 
   Depends on T1.4, T1.5, T1.2, T2.1, T1.8 (VaultIo for tag/folder suggesters).
 
@@ -111,7 +111,7 @@ This phase delivers all user-visible surfaces and the `main.ts` lifecycle wiring
      - [ ] All three source-type variants editable `[ref: PRD/F2]`
      - [ ] `flattenOnTarget` correctly hidden for `note` type `[ref: SDD/F2 AC]`
 
-- [ ] **T3.8 ImportSubtab** `[activity: frontend-ui]`
+- [x] **T3.8 ImportSubtab** `[activity: frontend-ui]`
 
   Depends on T3.6 (ImportRuleEditor).
 
@@ -123,7 +123,7 @@ This phase delivers all user-visible surfaces and the `main.ts` lifecycle wiring
      - [ ] Empty state and populated list both covered `[ref: PRD/F1]`
      - [ ] Toggle / Run / Delete wired correctly `[ref: PRD/F8]`
 
-- [ ] **T3.9 ExportSubtab** `[activity: frontend-ui]`
+- [x] **T3.9 ExportSubtab** `[activity: frontend-ui]`
 
   Depends on T3.7 (ExportRuleEditor).
 
@@ -134,7 +134,7 @@ This phase delivers all user-visible surfaces and the `main.ts` lifecycle wiring
   5. Success:
      - [ ] Same coverage as Import side `[ref: PRD/F2]`
 
-- [ ] **T3.10 SettingsTab orchestrator** `[activity: frontend-ui]`
+- [x] **T3.10 SettingsTab orchestrator** `[activity: frontend-ui]`
 
   Depends on T3.4 (HeaderSection), T3.5 (GeneralSubtab), T3.8 (ImportSubtab), T3.9 (ExportSubtab).
 
@@ -146,7 +146,7 @@ This phase delivers all user-visible surfaces and the `main.ts` lifecycle wiring
      - [ ] 3 subtabs + manifest-driven header `[ref: SDD/ADR-10]`
      - [ ] Subtab swap under 50ms perf budget `[ref: SDD/Quality Requirements/Performance]`
 
-- [ ] **T3.11 main.ts rewire (HakobiPlugin lifecycle)** `[activity: backend-api]`
+- [x] **T3.11 main.ts rewire (HakobiPlugin lifecycle)** `[activity: backend-api]`
 
   Depends on every prior task in Phases 1–3.
 
@@ -155,8 +155,8 @@ This phase delivers all user-visible surfaces and the `main.ts` lifecycle wiring
   3. Implement: rewrite `src/main.ts`. Update `src/types/index.ts` to re-export the domain types (Rule, AuditEntry, GlobalSettings, DeviceState, RuleId).
   4. Validate: lint + typecheck. `npm run build` produces a single bundle ≤ 100 KB minified.
   5. Success:
-     - [ ] Lifecycle clean (no leaks) `[ref: SDD/Quality Requirements/Reliability]`
-     - [ ] All wiring follows downward-only dependency direction `[ref: SDD/ADR-1]`
+     - [x] Lifecycle clean (no leaks) `[ref: SDD/Quality Requirements/Reliability]`
+     - [x] All wiring follows downward-only dependency direction `[ref: SDD/ADR-1]`
 
 - [ ] **T3.12 Phase 3 Validation** `[activity: validate]`
 

@@ -121,7 +121,7 @@ export class Plugin extends Component {
 	loadData = vi.fn(async () => ({}));
 	saveData = vi.fn(async () => {});
 	addRibbonIcon = vi.fn(() => document.createElement("div"));
-	addStatusBarItem = vi.fn(() => ({ setText: vi.fn() }));
+	addStatusBarItem = vi.fn(() => augmentEl(document.createElement("div")));
 	addCommand = vi.fn();
 	addSettingTab = vi.fn();
 	register = vi.fn((fn: () => unknown) => {
