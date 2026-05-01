@@ -18,10 +18,13 @@
 //  - A single `runWithTimeout` helper races each `fs/promises` call against a
 //    timer. The timer is always cleared on settle — including the timeout
 //    branch — so we never leak a Node.js timer beyond the operation.
-//  - `mapError` translates `NodeJS.ErrnoException.code` into one of five
-//    typed exceptions. Anything we do not recognise becomes IoUnknownError
-//    rather than escaping; this is the load-bearing invariant that lets
-//    higher layers serialize errorCode safely.
+//  - `mapError` translates `NodeJS.ErrnoException.code` into one of four
+//    typed exceptions (per T1.7 spec): IoTimeoutError, IoNotFoundError,
+//    IoPermissionError, IoUnknownError. Anything we do not recognise becomes
+//    IoUnknownError rather than escaping; this is the load-bearing invariant
+//    that lets higher layers serialize errorCode safely. ENOSPC is carried as
+//    IoUnknownError with errorCode='disk-full' — the closed errorCode set
+//    keeps disk-full distinguishable without adding a fifth class.
 //  - `lstat` returns the real `fs.Stats` object — its `isSymbolicLink`,
 //    `isDirectory`, and `isFile` methods are exactly what scope.ts and the
 //    transfer engines need (`FsScopeAdapter['lstat']`).
@@ -107,15 +110,14 @@ export class IoPermissionError extends IoError {
   }
 }
 
-export class IoDiskFullError extends IoError {
-  constructor(opName: string, path: string, cause: unknown) {
-    super("disk-full", opName, path, `${opName}(${path}) disk full`, cause);
-  }
-}
-
 export class IoUnknownError extends IoError {
-  constructor(opName: string, path: string, cause: unknown) {
-    super("unknown", opName, path, `${opName}(${path}) failed`, cause);
+  constructor(
+    opName: string,
+    path: string,
+    cause: unknown,
+    errorCode: IoErrorCode = "unknown",
+  ) {
+    super(errorCode, opName, path, `${opName}(${path}) failed`, cause);
   }
 }
 
@@ -263,7 +265,8 @@ function mapError(opName: string, path: string, err: unknown): IoError {
     case "EPERM":
       return new IoPermissionError(opName, path, err);
     case "ENOSPC":
-      return new IoDiskFullError(opName, path, err);
+      // disk-full carried as IoUnknownError per T1.7 spec; class hierarchy stays at 4 exported classes.
+      return new IoUnknownError(opName, path, err, "disk-full");
     default:
       return new IoUnknownError(opName, path, err);
   }

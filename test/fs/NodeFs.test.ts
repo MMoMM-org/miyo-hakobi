@@ -36,7 +36,6 @@ import {
   IoTimeoutError,
   IoNotFoundError,
   IoPermissionError,
-  IoDiskFullError,
   IoUnknownError,
   type IoErrorCode,
 } from "../../src/fs/NodeFs";
@@ -316,17 +315,18 @@ describe("NodeFs — error mapping", () => {
     }
   });
 
-  it("ENOSPC → IoDiskFullError(errorCode='disk-full')", async () => {
-    // Decision: ENOSPC maps to a dedicated IoDiskFullError class (rather than
-    // IoUnknownError with errorCode='disk-full') so callers can pattern-match
-    // disk-full at the type level. errorCode is still in the closed set.
+  it("ENOSPC → IoUnknownError(errorCode='disk-full')", async () => {
+    // Per T1.7 spec, the typed exception hierarchy has exactly four subclasses
+    // (IoTimeoutError, IoNotFoundError, IoPermissionError, IoUnknownError).
+    // ENOSPC therefore flows through IoUnknownError, but with the closed
+    // errorCode 'disk-full' so audit consumers can still distinguish it.
     mocks.writeFile.mockRejectedValueOnce(errnoErr("ENOSPC"));
     const fs = fixedTimeout(1000);
     try {
       await fs.writeFile("/p/big", "data");
       throw new Error("expected ENOSPC mapping");
     } catch (e) {
-      expect(e).toBeInstanceOf(IoDiskFullError);
+      expect(e).toBeInstanceOf(IoUnknownError);
       expect((e as IoError).errorCode).toBe("disk-full");
     }
   });
