@@ -51,7 +51,7 @@ describe("Notices helper", () => {
 			const timeout = Notice._instances[0].timeout;
 			// Default timeout: undefined (not passed) or any non-zero value.
 			// We specifically must NOT pass 0 (which means persistent).
-			expect(timeout).not.toBe(0);
+			expect(timeout).toBeUndefined();
 		});
 	});
 
