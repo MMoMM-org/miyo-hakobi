@@ -9,6 +9,7 @@
  *  8. "Show audit log" when openInDefaultApp throws → transient notice with path
  *  9. Purge button confirmed → purgeAll called, purge notice shown
  * 10. Purge button declined → purgeAll NOT called, no notice
+ * 11. Invalid numeric inputs (non-integer, scientific notation, negative) → no save, input reset
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
@@ -349,5 +350,34 @@ describe("GeneralSubtab", () => {
 
 		expect(purgeAll).not.toHaveBeenCalled();
 		expect(deps.notices.transient).not.toHaveBeenCalled();
+	});
+
+	// -------------------------------------------------------------------------
+	// Test 11: Invalid numeric inputs — no save, input reset to previous value
+	// -------------------------------------------------------------------------
+
+	it.each([
+		{ label: "max bytes", invalid: "abc",  field: "auditMaxBytes",     seed: SEED_SETTINGS.auditMaxBytes },
+		{ label: "max bytes", invalid: "1e5",  field: "auditMaxBytes",     seed: SEED_SETTINGS.auditMaxBytes },
+		{ label: "max bytes", invalid: "-5",   field: "auditMaxBytes",     seed: SEED_SETTINGS.auditMaxBytes },
+		{ label: "timeout",   invalid: "1e5",  field: "perFileTimeoutMs",  seed: SEED_SETTINGS.perFileTimeoutMs },
+	])("invalid input '$invalid' in '$label' does not save and resets input to seed value", async ({ label, invalid, seed }) => {
+		const saveGlobalSettings = vi.fn(async () => {});
+		const deps = makeDeps({ saveGlobalSettings });
+		const subtab = new GeneralSubtab(deps);
+		subtab.render(containerEl);
+		await flushMicrotasks();
+
+		const input = findInputByLabel(containerEl, label);
+		expect(input).not.toBeNull();
+
+		input!.value = invalid;
+		input!.dispatchEvent(new Event("input"));
+		await flushMicrotasks();
+
+		// saveGlobalSettings must NOT have been called with the invalid value
+		expect(saveGlobalSettings).not.toHaveBeenCalled();
+		// The input must be reset to the previously loaded value
+		expect(input!.value).toBe(String(seed));
 	});
 });

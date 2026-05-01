@@ -166,8 +166,10 @@ export class GeneralSubtab {
 				text
 					.setValue(String(opts.getCurrent()[opts.field]))
 					.onChange((raw) => {
-						const parsed = parseInt(raw, 10);
-						if (!Number.isFinite(parsed) || parsed <= 0) {
+						const parsed = Number(raw);
+						// Require a plain positive integer string — reject scientific
+						// notation (e.g. "1e5"), decimals, negatives, and non-numeric input.
+						if (!Number.isInteger(parsed) || parsed <= 0 || !/^\d+$/.test(raw.trim())) {
 							// Invalid — reset to the current value
 							text.setValue(String(opts.getCurrent()[opts.field]));
 							return;
@@ -216,7 +218,7 @@ export class GeneralSubtab {
 // ConfirmModal — tiny Obsidian Modal subclass usable as the production `confirm`
 // seam. Import Modal from obsidian; production main.ts wires this as:
 //
-//   confirm: (msg) => new ConfirmModal(app, msg).open()
+//   confirm: (msg) => new ConfirmModal(app, msg).show()
 //
 // The subtab itself accepts `confirm` as a function — ConfirmModal is a
 // convenience export for production wiring; tests never import it.
