@@ -44,7 +44,7 @@ This phase delivers the pure, Obsidian-free foundation: types, sanitize, scope, 
      - [ ] Every documented sanitization rule has both accept and reject test cases `[ref: PRD/F4]`
      - [ ] `sanitize.ts` is dependency-free (no Obsidian, no Node fs imports) `[ref: SDD/Solution Strategy]`
 
-- [ ] **T1.2 Default-deny scope checks** `[activity: domain-modeling] [parallel: true]`
+- [x] **T1.2 Default-deny scope checks** `[activity: domain-modeling] [parallel: true]`
 
   1. Prime: Read scope requirements `[ref: SDD/Application Data Models; rule.ts]`, `[ref: PRD/F9]`, `[ref: SDD/Acceptance Criteria/Default-Deny Criteria]`.
   2. Test: realpath escape rejection (symlink trap, `..` chain); vault-internal-source AND vault-internal-destination rejection; vault root / `.obsidian/` / plugin data dir rejection; symlink at rule root rejection; symlink for an enumerated child rejection; absolute path inside a filename rejection.
