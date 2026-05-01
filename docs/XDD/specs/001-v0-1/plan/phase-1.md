@@ -123,7 +123,7 @@ This phase delivers the pure, Obsidian-free foundation: types, sanitize, scope, 
      - [x] No half-files in destination on simulated mid-write failure (asserted via mock injection) `[ref: SDD/BR3]`
      - [x] Collision suffix algorithm matches the SDD walkthrough byte-for-byte `[ref: SDD/Implementation Examples]`
 
-- [ ] **T1.10 AuditLog + Rotation** `[activity: data-architecture]`
+- [x] **T1.10 AuditLog + Rotation** `[activity: data-architecture]`
 
   Depends on T1.6 (AuditEntry) and T1.7 (NodeFs).
 
@@ -135,7 +135,7 @@ This phase delivers the pure, Obsidian-free foundation: types, sanitize, scope, 
      - [ ] Audit entries are metadata-only (test asserts no string field contains "/Users/" or "/home/" absolute prefixes) `[ref: PRD/F5, Constitution L2]`
      - [ ] Audit files outside the vault (in plugin data dir) `[ref: SDD/ADR-3]`
 
-- [ ] **T1.11 Phase 1 Validation** `[activity: validate]`
+- [x] **T1.11 Phase 1 Validation** `[activity: validate]`
 
   - Run `npm run typecheck && npm test && npm run lint && npm run build`.
   - Assert no Obsidian / fs imports in `src/domain/` modules (grep-based test).

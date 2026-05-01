@@ -48,6 +48,7 @@
 | 2026-04-30 | ADRs 4, 5, 6, 7, 10 approved as drafted | All 12 ADRs now confirmed; SDD complete. ADR-4 (audit log path = rule-root-relative), ADR-5 (path expansion at config save), ADR-6 (mtime preserve on export only), ADR-7 (UUID v4 rule ID), ADR-10 (3-subtab IA). |
 | 2026-04-30 | PLAN: 4 phases, 38 tasks | Phase 1 Domain & Audit Primitives (11 tasks, mostly parallel) → Phase 2 Engine (7 tasks) → Phase 3 UI & Lifecycle (12 tasks) → Phase 4 Integration & Polish (8 tasks). All PRD F1–F12 → task mappings verified in plan/README.md verification table. |
 | 2026-04-30 | PLAN: added explicit `src/persistence/` modules (RuleStore, DeviceStore) | The SDD's mermaid diagram showed RuleStore + DeviceStore as components but the directory map did not list them as files. Plan T2.1 + T2.2 create these modules under `src/persistence/`. Minor SDD addition; not a deviation, but logged here for traceability. |
+| 2026-05-01 | T1.11: retain legacy `PluginSettings` / `DEFAULT_SETTINGS` exports in `src/types/index.ts` as compatibility aliases | `src/main.ts` and `src/settings/SettingsTab.ts` still import the original esbuild-template types. Removing them would force `main.ts` rewiring into Phase 1, conflating scopes. The aliases are clearly marked as legacy and scheduled for removal in Phase 3 alongside the main.ts rewire. New `PluginData` / `GlobalSettings` / `DeviceState` exports are in place per the SDD. |
 
 ## Context
 
