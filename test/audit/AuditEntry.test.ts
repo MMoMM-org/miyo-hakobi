@@ -89,13 +89,15 @@ const fileWouldWrite: AuditEntry = {
   decision: "would-write",
 };
 
+// Export-direction fixture so the round-trip table exercises BOTH directions
+// (the other four fixtures are import). Per code-quality review on T1.6.
 const fileRejected: AuditEntry = {
   timestamp: "2026-05-01T12:04:00.000Z",
   ruleId: RULE_ID,
-  ruleName: "Voice memos",
-  direction: "import",
+  ruleName: "Daily notes export",
+  direction: "export",
   operation: "rejected",
-  sourcePathRelative: "weird-symlink.m4a",
+  sourcePathRelative: "weird-symlink.md",
   decision: "rejected",
   errorCode: "symlink-refused",
 };
@@ -208,12 +210,23 @@ describe("serializeAuditEntry", () => {
       ...ruleOk,
       // These are not part of AuditEntry — type-cast to satisfy the test setup.
       content: "secret bytes",
-      __proto__: { injected: true },
     } as AuditEntry & Record<string, unknown>;
+    // Use defineProperty with enumerable:true to create a *genuine* own,
+    // enumerable property — this is what JSON.stringify and Object.keys see.
+    // (A plain `__proto__: {...}` literal sets the prototype, not an own
+    // property, so it would never be iterated and the assertion below would
+    // be vacuous.) This makes `not.toContain("injected")` load-bearing: it
+    // would FAIL for a naive `JSON.stringify(entry)` serializer and PASS only
+    // for the closed-allowlist walk that backs the PRD/F5 privacy guarantee.
+    Object.defineProperty(polluted, "injected", {
+      value: "leaked-marker",
+      enumerable: true,
+    });
     const line = serializeAuditEntry(polluted);
     expect(line).not.toContain("content");
     expect(line).not.toContain("secret bytes");
     expect(line).not.toContain("injected");
+    expect(line).not.toContain("leaked-marker");
   });
 });
 
@@ -454,7 +467,7 @@ describe("Round-trip serialize → parse", () => {
     { name: "rule-level partial with errorCode", entry: rulePartial },
     { name: "per-file ok with bytes + duration", entry: fileOk },
     { name: "per-file would-write (dry-run)", entry: fileWouldWrite },
-    { name: "per-file rejected (symlink-refused, source path only)", entry: fileRejected },
+    { name: "per-file rejected export (symlink-refused, source path only)", entry: fileRejected },
   ];
 
   for (const { name, entry } of cases) {
