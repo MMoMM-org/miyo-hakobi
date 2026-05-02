@@ -12,6 +12,7 @@
 # Plugin under development — symlinked or copied from build output
 .obsidian/plugins/*/data.json
 .obsidian/plugins/*/main.js
+.obsidian/plugins/*/manifest.json
 .obsidian/plugins/*/styles.css
 
 # Keep hot-reload (committed tooling)
