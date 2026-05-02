@@ -64,14 +64,6 @@ describe("Notices helper", () => {
 		});
 	});
 
-	describe("noActiveNote()", () => {
-		it('creates a Notice with the canonical "No active note" message', () => {
-			Notices.noActiveNote();
-			expect(Notice._instances).toHaveLength(1);
-			expect(Notice._instances[0].message).toBe("No active note");
-		});
-	});
-
 	describe("ruleAlreadyRunning()", () => {
 		it("creates a Notice with the canonical 'Rule already running' message", () => {
 			Notices.ruleAlreadyRunning("Voice memos");

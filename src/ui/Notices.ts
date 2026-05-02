@@ -26,15 +26,6 @@ export function persistent(message: string): void {
 }
 
 /**
- * Shows the canonical "No active note" notice.
- * Fires when a command requires an active editor but none is open.
- */
-export function noActiveNote(): void {
-	// Canonical string — must match exactly; tests assert this verbatim.
-	new Notice("No active note");
-}
-
-/**
  * Shows the canonical "Rule already running" notice for the given rule name.
  * Fires when the scheduler rejects a concurrent execution of the same rule.
  */
