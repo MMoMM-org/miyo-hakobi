@@ -2,7 +2,7 @@
 //
 // WHY this file exists:
 // Verifies that HakobiPlugin wires every Phase 1-3 module correctly in its
-// onload/onunload lifecycle: construction order, Obsidian surface calls (addCommand x7,
+// onload/onunload lifecycle: construction order, Obsidian surface calls (addCommand x6,
 // addStatusBarItem, addSettingTab), scheduler start/stop, timer cleanup, and
 // manifest identity invariants.
 //
@@ -88,11 +88,11 @@ describe("HakobiPlugin", () => {
     expect(plugin.addStatusBarItem).toHaveBeenCalledTimes(1);
   });
 
-  // T3.11-4: addCommand called exactly 7 times
-  it("calls addCommand exactly 7 times after onload()", async () => {
+  // T3.11-4: addCommand called exactly 6 times
+  it("calls addCommand exactly 6 times after onload()", async () => {
     const plugin = await makePlugin();
     await plugin.onload();
-    expect(plugin.addCommand).toHaveBeenCalledTimes(7);
+    expect(plugin.addCommand).toHaveBeenCalledTimes(6);
   });
 
   // T3.11-5: scheduler.start() called

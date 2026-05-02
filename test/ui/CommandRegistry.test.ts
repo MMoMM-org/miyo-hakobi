@@ -1,12 +1,11 @@
 // CommandRegistry.test.ts — TDD tests for T3.3.
 //
-// These tests verify that CommandRegistry registers exactly 7 commands with
+// These tests verify that CommandRegistry registers exactly 6 commands with
 // correct IDs and that each callback delegates to the right scheduler/notice
 // method. The `selectRule` seam is injected as a vi.fn() so no Obsidian
 // FuzzySuggestModal is needed in tests.
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { TFile } from "../__mocks__/obsidian";
+import { describe, it, expect, vi } from "vitest";
 import type { ImportRule, ExportFolderRule } from "../../src/domain/rule";
 import type { RuleId } from "../../src/domain/rule";
 import { CommandRegistry } from "../../src/ui/CommandRegistry";
@@ -62,7 +61,6 @@ function makeDeps(overrides?: Partial<CommandRegistryDeps>): {
 	plugin: CommandRegistryDeps["plugin"];
 	scheduler: CommandRegistryDeps["scheduler"];
 	ruleStore: CommandRegistryDeps["ruleStore"];
-	vaultIo: CommandRegistryDeps["vaultIo"];
 	notices: CommandRegistryDeps["notices"];
 	selectRule: NonNullable<CommandRegistryDeps["selectRule"]>;
 } {
@@ -83,12 +81,7 @@ function makeDeps(overrides?: Partial<CommandRegistryDeps>): {
 		load: vi.fn(async () => ({ rules: [importRule, exportRule] })),
 	};
 
-	const vaultIo = {
-		getActiveFile: vi.fn((): TFile | null => null),
-	};
-
 	const notices = {
-		noActiveNote: vi.fn(),
 		ruleAlreadyRunning: vi.fn(),
 		transient: vi.fn(),
 	};
@@ -102,13 +95,12 @@ function makeDeps(overrides?: Partial<CommandRegistryDeps>): {
 		plugin,
 		scheduler,
 		ruleStore,
-		vaultIo,
 		notices,
 		selectRule,
 		...overrides,
 	};
 
-	return { deps, commands, plugin, scheduler, ruleStore, vaultIo, notices, selectRule };
+	return { deps, commands, plugin, scheduler, ruleStore, notices, selectRule };
 }
 
 // ---------------------------------------------------------------------------
@@ -117,14 +109,14 @@ function makeDeps(overrides?: Partial<CommandRegistryDeps>): {
 
 describe("CommandRegistry", () => {
 	describe("registerAll()", () => {
-		it("calls plugin.addCommand exactly 7 times", () => {
+		it("calls plugin.addCommand exactly 6 times", () => {
 			const { deps, commands } = makeDeps();
 			const registry = new CommandRegistry(deps);
 			registry.registerAll();
-			expect(commands).toHaveLength(7);
+			expect(commands).toHaveLength(6);
 		});
 
-		it("registers exactly the 7 expected IDs and no others", () => {
+		it("registers exactly the 6 expected IDs and no others", () => {
 			const { deps, commands } = makeDeps();
 			const registry = new CommandRegistry(deps);
 			registry.registerAll();
@@ -135,7 +127,6 @@ describe("CommandRegistry", () => {
 				"run-import-select",
 				"run-export-all",
 				"run-export-select",
-				"export-this-note",
 				"run-import-dry-run-select",
 				"run-export-dry-run-select",
 			];
@@ -258,37 +249,6 @@ describe("CommandRegistry", () => {
 
 			expect(scheduler.runOnce).toHaveBeenCalledOnce();
 			expect(scheduler.runOnce).toHaveBeenCalledWith(exportRule.id, { dryRun: true });
-		});
-	});
-
-	describe("export-this-note callback", () => {
-		it("calls notices.noActiveNote() and does NOT invoke scheduler when no active file", async () => {
-			const { deps, commands, scheduler, notices } = makeDeps({
-				vaultIo: { getActiveFile: vi.fn(() => null) },
-			});
-			new CommandRegistry(deps).registerAll();
-
-			const cmd = commands.find((c) => c.id === "export-this-note")!;
-			await cmd.callback();
-
-			expect(notices.noActiveNote).toHaveBeenCalledOnce();
-			expect(scheduler.runOnce).not.toHaveBeenCalled();
-		});
-
-		it("calls scheduler.runOnce when there is an active TFile", async () => {
-			const activeFile = new TFile();
-			activeFile.path = "Notes/active.md";
-
-			const { deps, commands, scheduler, notices } = makeDeps({
-				vaultIo: { getActiveFile: vi.fn(() => activeFile) },
-			});
-			new CommandRegistry(deps).registerAll();
-
-			const cmd = commands.find((c) => c.id === "export-this-note")!;
-			await cmd.callback();
-
-			expect(notices.noActiveNote).not.toHaveBeenCalled();
-			expect(scheduler.runOnce).toHaveBeenCalledOnce();
 		});
 	});
 

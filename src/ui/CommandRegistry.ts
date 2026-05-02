@@ -1,11 +1,11 @@
-// CommandRegistry — registers the 7 PRD/F7 command-palette commands (T3.3).
+// CommandRegistry — registers the 6 PRD/F7 command-palette commands (T3.3).
 //
 // WHY this file exists:
-// Hakobi exposes seven commands to Obsidian's command palette, covering the
+// Hakobi exposes six commands to Obsidian's command palette, covering the
 // full PRD/F7 surface: run all imports, run a selected import rule, run all
-// exports, run a selected export rule, export the currently-active note,
-// and dry-run variants of the two "select" commands. This class owns the
-// wiring of those commands so `main.ts` stays thin (lifecycle only).
+// exports, run a selected export rule, and dry-run variants of the two
+// "select" commands. This class owns the wiring of those commands so
+// `main.ts` stays thin (lifecycle only).
 //
 // Design notes:
 //   - The `selectRule` dependency is an injectable seam. In production, the
@@ -22,14 +22,8 @@
 //     surface a runtime "already running" Notice. That is a Scheduler concern.
 //     `notices.ruleAlreadyRunning()` is available on the notices interface for
 //     future use from the Scheduler's audit observer (Phase 4+).
-//   - "Export this note" ad-hoc rule: for T3.3 scope, this command calls
-//     `scheduler.runOnce` with a synthetic rule id. The Scheduler's runOnce()
-//     looks up the rule by id from RuleStore, which means the ad-hoc rule will
-//     not be found for now. Full ad-hoc-rule plumbing (e.g. a runOnceAdhoc
-//     method or RuleStore injection) is deferred to Phase 4 / a follow-up task.
 
-import type { TFile } from "obsidian";
-import type { Rule, RuleId, ExportNoteRule } from "../domain/rule";
+import type { Rule, RuleId } from "../domain/rule";
 
 // ---------------------------------------------------------------------------
 // Structural dependency interfaces
@@ -50,11 +44,7 @@ export interface CommandRegistryDeps {
 	ruleStore: {
 		load(): Promise<{ rules: Rule[] }>;
 	};
-	vaultIo: {
-		getActiveFile(): TFile | null;
-	};
 	notices: {
-		noActiveNote(): void;
 		ruleAlreadyRunning(name: string): void;
 		transient(m: string): void;
 	};
@@ -77,9 +67,9 @@ export class CommandRegistry {
 		this.deps = deps;
 	}
 
-	/** Wire all 7 PRD/F7 commands onto the plugin. Call once from onload(). */
+	/** Wire all 6 PRD/F7 commands onto the plugin. Call once from onload(). */
 	registerAll(): void {
-		const { plugin, scheduler, ruleStore, vaultIo, notices } = this.deps;
+		const { plugin, scheduler, ruleStore } = this.deps;
 
 		// Default selectRule: no-op stub if no seam is injected. Production
 		// should always inject a real FuzzySuggestModal-backed implementation.
@@ -135,50 +125,7 @@ export class CommandRegistry {
 		});
 
 		// ------------------------------------------------------------------
-		// 5. export-this-note — Export the currently-active note
-		//
-		// TODO (Phase 4): The ad-hoc ExportNoteRule built here is given a
-		// synthetic id, but Scheduler.runOnce() looks up the rule by id from
-		// RuleStore. Until a runOnceAdhoc() method (or equivalent injection
-		// mechanism) is added to Scheduler, the Scheduler will not find the
-		// rule and the export will silently no-op. The command structure and
-		// TFile-null guard are correct; only the ad-hoc plumbing is deferred.
-		// ------------------------------------------------------------------
-		plugin.addCommand({
-			id: "export-this-note",
-			name: "Export this note",
-			callback: async () => {
-				const activeFile = vaultIo.getActiveFile();
-				if (activeFile === null) {
-					notices.noActiveNote();
-					return;
-				}
-
-				// Build an ad-hoc ExportNoteRule for the active file.
-				// The id is synthetic and not persisted — see TODO above.
-				const adhocRule: ExportNoteRule = {
-					id: "__active-note__" as RuleId,
-					name: activeFile.name,
-					direction: "export",
-					sourceType: "note",
-					sourceVaultNotePath: activeFile.path as ExportNoteRule["sourceVaultNotePath"],
-					// destinationPath is unknown without a configured rule — placeholder.
-					// Phase 4 will resolve destination from a user-selected export rule or
-					// a default configured path.
-					destinationPath: "" as ExportNoteRule["destinationPath"],
-					everyMinutes: 1,
-					action: "copy",
-					onCollision: "skip",
-					flattenOnTarget: false,
-					dryRun: false,
-				};
-
-				await scheduler.runOnce(adhocRule.id, { dryRun: false });
-			},
-		});
-
-		// ------------------------------------------------------------------
-		// 6. run-import-dry-run-select — Dry-run a selected import rule
+		// 5. run-import-dry-run-select — Dry-run a selected import rule
 		// ------------------------------------------------------------------
 		plugin.addCommand({
 			id: "run-import-dry-run-select",
@@ -193,7 +140,7 @@ export class CommandRegistry {
 		});
 
 		// ------------------------------------------------------------------
-		// 7. run-export-dry-run-select — Dry-run a selected export rule
+		// 6. run-export-dry-run-select — Dry-run a selected export rule
 		// ------------------------------------------------------------------
 		plugin.addCommand({
 			id: "run-export-dry-run-select",

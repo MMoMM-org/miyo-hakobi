@@ -976,7 +976,7 @@ N/A — single component.
 - **No in-tab audit-log viewer.** Audit-log inspection happens via the OS default app (typically a text editor) launched from the General-subtab button. This dramatically simplifies F6 — no pagination, no filter bar, no virtualized rendering — and lets the user use grep / their preferred tooling against the raw NDJSON.
 - No custom panes / leaves / views.
 - Status bar: single element with kanji 運; full state in tooltip.
-- Command palette: 7 commands.
+- Command palette: 6 commands.
 
 **Design System**
 - Components: standard Obsidian `Setting`, `ButtonComponent`, `ToggleComponent`, `DropdownComponent`, `TextComponent`, `Notice`, plus the standard suggester for fuzzy-pick of rule names and active-note destination rules.
@@ -1203,8 +1203,7 @@ EARS-format system-level criteria translating PRD acceptance scenarios:
 - [ ] WHEN the user clicks "Purge audit log now" on the General subtab, THE SYSTEM SHALL prompt for explicit confirmation before deleting all NDJSON files under `audit/`, then write a single new entry confirming the purge.
 
 **Command Palette Criteria (PRD/F7)**
-- [ ] THE SYSTEM SHALL register exactly seven commands without the `Hakobi:` prefix in the command ID (Obsidian prefixes automatically).
-- [ ] WHEN `Export this note` is invoked with no active note, THE SYSTEM SHALL show the Notice "No active note" and not run.
+- [ ] THE SYSTEM SHALL register exactly six commands without the `Hakobi:` prefix in the command ID (Obsidian prefixes automatically).
 
 **Storage Criteria (PRD/F8)**
 - [ ] THE SYSTEM SHALL persist rule definitions in `data.json` and per-device enable flags in `device.json`.

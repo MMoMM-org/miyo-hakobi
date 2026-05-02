@@ -14,6 +14,7 @@
 - [Audit log](#audit-log)
 - [Troubleshooting / FAQ](#troubleshooting--faq)
 - [Privacy](#privacy)
+- [Possible future features](#possible-future-features)
 - [Development](#development)
 - [License](#license)
 
@@ -98,13 +99,12 @@ Same shape as Import. Source-type can be **folder** (vault subtree, recursive), 
 
 ## Commands
 
-Hakobi registers exactly seven commands. Obsidian auto-prefixes commands with the plugin name in the command palette, so they appear as `Hakobi: …`.
+Hakobi registers exactly six commands. Obsidian auto-prefixes commands with the plugin name in the command palette, so they appear as `Hakobi: …`.
 
 - `Run all import rules`
 - `Run an import rule…`
 - `Run all export rules`
 - `Run an export rule…`
-- `Export this note` — pick from the configured export rules and ferry the active note via that rule's destination + collision policy. If no note is active, you get a `No active note` notice.
 - `Dry-run an import rule…` — runs the rule without writing anything; the audit log records `would-write` / `would-skip` / `would-suffix` decisions.
 - `Dry-run an export rule…` — same, for export rules.
 
@@ -176,12 +176,6 @@ If you tried to save such a rule, you saw a validation error explaining which bo
 
 Per-device enable flags (`enabledOnThisDevice`) default to `false` on each newly-Synced device specifically to prevent this. Pick **one** device that should run each rule. See [Per-device enablement](#per-device-enablement).
 
-### "Export this note" silently does nothing
-
-The `Export this note` command is a **placeholder in v0.1** and currently no-ops. The full picker UX (a fuzzy-suggest list of configured export rules + active-note routing) is deferred to v0.2 (tracked in the spec README's Decisions Log entry dated 2026-05-01).
-
-Workaround for v0.1: configure a regular **export rule of `type: note`** pointing at the specific vault note you want exported. Run it from the **command palette** via `Run an export rule…` and pick the note rule, or simply let it fire on its `everyMinutes` schedule.
-
 ### "Why does my import rule keep picking up the same file twice?"
 
 If your import source folder is *itself* the destination of an Obsidian Sync replica from another device (e.g. you point Hakobi at `~/Library/Mobile Documents/iCloud~md~obsidian/Documents/Captures/` while another device is also Syncing into that folder), Hakobi can pick the file up before Sync has finished materializing it on this machine, or pick it up on multiple devices. The primary defence is the per-device `enabledOnThisDevice` flag — keep the import rule enabled on exactly one device. Prefer configuring import sources to point at local capture folders that Obsidian Sync does **not** write into.
@@ -189,6 +183,12 @@ If your import source folder is *itself* the destination of an Obsidian Sync rep
 ## Privacy
 
 Hakobi is local-first with no telemetry, no analytics, and no network surfaces. The full privacy contract — including the closed audit-log field allowlist, the symlink-refusal rationale, and the cross-plugin-readability disclosure — lives in **[PRIVACY.md](PRIVACY.md)**.
+
+## Possible future features
+
+These are ideas that have been considered but are not committed to any release. No promises, no timelines.
+
+- **Export the active note via a chosen rule** — one-shot active-note export with a fuzzy-suggester modal that lists configured export rules. Currently you can configure a `type: note` export rule for any specific note and run it via `Run an export rule…`.
 
 ## Development
 

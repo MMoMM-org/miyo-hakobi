@@ -87,7 +87,7 @@ None in v0.1. Hakobi is single-operator. No multi-user, shared-vault, or admin-v
 1. **Awareness:** User wants to make a vault folder ("Public/") visible to a partner via a shared cloud-synced folder, or wants to export tagged research notes to a backup location nightly.
 2. **Consideration:** Same alternatives, same reasoning as above.
 3. **Adoption:** Opens Hakobi settings, clicks "Add export rule".
-4. **Usage:** Names the rule, chooses folder/tag/note source, picks destination FS path, schedule, `action: copy | move`, collision policy. Optionally invokes "Hakobi: Export this note" via command palette to force a one-shot export of the active note via that rule.
+4. **Usage:** Names the rule, chooses folder/tag/note source, picks destination FS path, schedule, `action: copy | move`, collision policy. The rule then ferries on its `everyMinutes` schedule, or can be triggered ad-hoc via "Hakobi: Run an export rule…" from the command palette.
 5. **Retention:** Audit log + status bar make failures discoverable; `move` action with clear audit trail builds trust; per-device enable flag prevents Sync-induced conflict storms.
 
 ## Feature Requirements
@@ -157,9 +157,8 @@ None in v0.1. Hakobi is single-operator. No multi-user, shared-vault, or admin-v
 #### F7: Command-palette commands
 - **User Story:** As a vault owner, I want command-palette commands for triggering and running rules manually, so that I can force a transfer without waiting for the next tick.
 - **Acceptance Criteria:**
-  - [ ] Given the plugin is loaded, Then exactly these commands are registered: `Run import (all rules)`, `Run import (select rule)`, `Run export (all rules)`, `Run export (select rule)`, `Export this note`, `Run import (dry run, select rule)`, `Run export (dry run, select rule)`. (Obsidian prefixes registered commands with the plugin name automatically; the `Hakobi:` prefix must NOT be added in code.)
+  - [ ] Given the plugin is loaded, Then exactly these commands are registered: `Run import (all rules)`, `Run import (select rule)`, `Run export (all rules)`, `Run export (select rule)`, `Run import (dry run, select rule)`, `Run export (dry run, select rule)`. (Obsidian prefixes registered commands with the plugin name automatically; the `Hakobi:` prefix must NOT be added in code.)
   - [ ] Given the user invokes `Run import/export (select rule)`, Then a fuzzy-suggest list of import/export rule names is presented; selecting one runs that rule once immediately.
-  - [ ] Given the user invokes `Export this note` while a note is active in the editor, Then a fuzzy-suggest list of export rules is presented; selecting one exports the active note via that rule's destination + collision policy. If no note is active, a Notice "No active note" appears and no command is run.
   - [ ] Given the user invokes any "Run …" command while the same rule is already in flight, Then the command is no-op'd and a Notice "Rule already running" appears.
 
 #### F8: Rule storage (hybrid)
@@ -203,7 +202,7 @@ None in v0.1. Hakobi is single-operator. No multi-user, shared-vault, or admin-v
 ### Could Have Features
 
 #### F12: File-menu integration
-- Right-click on a note in the file explorer → "Export via rule…". Same effect as the `Export this note` command. Convenience only — defer if it costs measurable schedule.
+- Right-click on a note in the file explorer → "Export via rule…". Presents a fuzzy-suggester picker of configured export rules and ferries the selected note via the chosen rule's destination + collision policy. Convenience only — defer if it costs measurable schedule. (Note: a parallel command-palette entry for the same picker UX is listed as a "Possible future feature" in the user README — not committed to v0.1.)
 
 ### Won't Have (This Phase)
 - External network surface, ports, MCP server, inbound HTTP listener, IPC.
@@ -327,7 +326,7 @@ Hakobi does **not** track or transmit any user actions externally. The audit log
 
 ## Open Questions
 
-The shape decisions are resolved (rule storage = hybrid; per-rule `copy | move`; collision = skip default + per-rule suffix override; "Export this note" = pick from configured rules; status bar IN v0.1; dry-run IN v0.1). Remaining questions intentionally deferred to SDD-time so they can be answered at the point of binding the design to types and code paths:
+The shape decisions are resolved (rule storage = hybrid; per-rule `copy | move`; collision = skip default + per-rule suffix override; one-shot active-note export via picker = removed from v0.1 scope and listed as a "Possible future feature" in the user README; status bar IN v0.1; dry-run IN v0.1). Remaining questions intentionally deferred to SDD-time so they can be answered at the point of binding the design to types and code paths:
 
 - [ ] Audit log error-code closed enum — finalize before SDD types are written. Initial proposal: `source-not-found`, `destination-not-writable`, `destination-parent-missing`, `destination-name-conflicts-note`, `symlink-refused`, `loop-refused`, `forbidden-path`, `sanitization-rejected`, `sanitization-empty`, `housekeeping-file`, `io-timeout`, `source-modified`, `source-vanished`, `source-is-symlink`, `subdir-is-symlink`, `disk-full`, `permission-denied`, `unknown`. **Defer to SDD.**
 - [ ] Path expansion — does Hakobi expand `~` and `$HOME` / `%USERPROFILE%` at config time? Recommendation: yes, expand at config-time and persist the resolved absolute path. **Defer to SDD.**

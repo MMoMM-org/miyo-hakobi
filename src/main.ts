@@ -385,7 +385,6 @@ export default class HakobiPlugin extends Plugin {
       plugin: this,
       scheduler: this.scheduler,
       ruleStore,
-      vaultIo,
       notices: Notices,
     });
     commandRegistry.registerAll();

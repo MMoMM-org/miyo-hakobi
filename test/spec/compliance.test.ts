@@ -4,7 +4,7 @@
 // Phase 4 task T4.7 of spec 001-v0-1 calls for a single drift-canary test that
 // snapshots the cross-cutting properties of v0.1 the spec promises:
 //
-//   1. Registered command set      (PRD/F7 — closed list of 7 commands)
+//   1. Registered command set      (PRD/F7 — closed list of 6 commands)
 //   2. Audit log field allowlist   (PRD/F5 — closed metadata-only set)
 //   3. Bundled artefacts present   (build/main.js, manifest.json, styles.css)
 //   4. Lifecycle register* hygiene (Constitution L1 Operations / no-daemon)
@@ -60,7 +60,6 @@ const EXPECTED_COMMANDS = [
 	{ id: "run-import-select", name: "Run an import rule…" },
 	{ id: "run-export-all", name: "Run all export rules" },
 	{ id: "run-export-select", name: "Run an export rule…" },
-	{ id: "export-this-note", name: "Export this note" },
 	{ id: "run-import-dry-run-select", name: "Dry-run an import rule…" },
 	{ id: "run-export-dry-run-select", name: "Dry-run an export rule…" },
 ] as const;
@@ -147,7 +146,7 @@ const F_MAPPING: Record<string, readonly string[]> = {
 	F11: ["test/fs/NodeFs.test.ts"],
 	// F12 — File-menu integration (Could Have, deferred — covered by absence
 	//       in the won't-have section indirectly; mapped to a test that proves
-	//       the feature surface is at least the documented seven-command set).
+	//       the feature surface is at least the documented six-command set).
 	F12: ["test/ui/CommandRegistry.test.ts"],
 } as const;
 
@@ -258,7 +257,7 @@ describe("spec compliance — T4.7 final sweep", () => {
 	// Section 1 — Registered commands snapshot (PRD/F7)
 	// ------------------------------------------------------------------
 	describe("registered commands snapshot (PRD/F7)", () => {
-		it("HakobiPlugin.onload() registers exactly the closed set of 7 commands", async () => {
+		it("HakobiPlugin.onload() registers exactly the closed set of 6 commands", async () => {
 			const { default: HakobiPlugin } = await import("../../src/main");
 
 			const app = makeApp();

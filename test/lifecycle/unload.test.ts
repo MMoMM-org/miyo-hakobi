@@ -152,7 +152,7 @@ describe("HakobiPlugin lifecycle", () => {
         (plugin.addSettingTab as ReturnType<typeof vi.fn>).mock.calls.length - baseAddSettingTabCalls;
       const addStatusBarItemDelta1 =
         (plugin.addStatusBarItem as ReturnType<typeof vi.fn>).mock.calls.length - baseAddStatusBarItemCalls;
-      expect(addCommandDelta1).toBe(7);
+      expect(addCommandDelta1).toBe(6);
       expect(addSettingTabDelta1).toBe(1);
       expect(addStatusBarItemDelta1).toBe(1);
 
@@ -212,8 +212,8 @@ describe("HakobiPlugin lifecycle", () => {
       ).toBeGreaterThan(0);
       expect(vi.getTimerCount()).toBeGreaterThan(0);
 
-      // Same delta as cycle 1: 7 commands, 1 settings tab, 1 status bar item.
-      // (If onload were leaving stale state behind, we might see >7 commands
+      // Same delta as cycle 1: 6 commands, 1 settings tab, 1 status bar item.
+      // (If onload were leaving stale state behind, we might see >6 commands
       // — duplicate registrations, the classic hot-reload bug.)
       const addCommandDelta2 =
         (plugin.addCommand as ReturnType<typeof vi.fn>).mock.calls.length - beforeCycle2AddCommandCalls;
@@ -221,7 +221,7 @@ describe("HakobiPlugin lifecycle", () => {
         (plugin.addSettingTab as ReturnType<typeof vi.fn>).mock.calls.length - beforeCycle2AddSettingTabCalls;
       const addStatusBarItemDelta2 =
         (plugin.addStatusBarItem as ReturnType<typeof vi.fn>).mock.calls.length - beforeCycle2AddStatusBarItemCalls;
-      expect(addCommandDelta2).toBe(7);
+      expect(addCommandDelta2).toBe(6);
       expect(addSettingTabDelta2).toBe(1);
       expect(addStatusBarItemDelta2).toBe(1);
 
