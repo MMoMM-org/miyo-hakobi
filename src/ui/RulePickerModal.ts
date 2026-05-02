@@ -64,9 +64,17 @@ export class RulePickerModal extends FuzzySuggestModal<Rule> {
 
 	onClose(): void {
 		super.onClose();
-		if (!this.resolved) {
-			this.resolved = true;
-			this.resolveFn(undefined);
-		}
+		// Obsidian calls close() BEFORE onChooseItem() in selectSuggestion(), so
+		// we cannot resolve undefined synchronously here — onChooseItem may still
+		// be about to fire on the same tick. Defer to the next microtask: if
+		// onChooseItem ran in the meantime, `resolved` is true and this is a
+		// no-op; if the user actually cancelled (Esc / click-outside), nothing
+		// will set resolved and we resolve with undefined.
+		queueMicrotask(() => {
+			if (!this.resolved) {
+				this.resolved = true;
+				this.resolveFn(undefined);
+			}
+		});
 	}
 }
