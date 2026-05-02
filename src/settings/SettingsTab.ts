@@ -58,20 +58,18 @@ const SUBTABS: SubtabMeta[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// Helper: call Obsidian's augmented DOM helpers via the Record cast pattern
-// used throughout the codebase (no innerHTML, no direct DOM mutation).
+// Helper: call Obsidian's augmented DOM helpers as methods so `this` is bound.
+// (Yanking the helper off the element via a Record cast strips `this`-binding;
+// the real Obsidian implementations are prototype methods that read `this`.)
+// No innerHTML, no direct DOM mutation.
 // ---------------------------------------------------------------------------
 
 function createDiv(el: HTMLElement, opts?: { cls?: string }): HTMLElement {
-	const any = el as unknown as Record<string, unknown>;
-	const create = any["createDiv"] as (opts?: { cls?: string }) => HTMLElement;
-	return create(opts);
+	return (el as unknown as { createDiv(opts?: { cls?: string }): HTMLElement }).createDiv(opts);
 }
 
 function emptyEl(el: HTMLElement): void {
-	const any = el as unknown as Record<string, unknown>;
-	const empty = any["empty"] as () => void;
-	empty();
+	(el as unknown as { empty(): void }).empty();
 }
 
 // ---------------------------------------------------------------------------
@@ -131,15 +129,16 @@ export class HakobiSettingsTab extends PluginSettingTab {
 			this._renderActiveSubtab(activeKey, bodyContainer);
 		};
 
-		const subtabRowAny = subtabRow as unknown as Record<string, unknown>;
-		const createEl = subtabRowAny["createEl"] as (
-			tag: string,
-			opts?: { cls?: string; text?: string },
-		) => HTMLElement;
+		const rowEl = subtabRow as unknown as {
+			createEl(tag: string, opts?: { cls?: string; text?: string }): HTMLElement;
+		};
 
 		for (const meta of SUBTABS) {
 			const cls = meta.key === initialSubtab ? "mod-cta" : "";
-			const btn = createEl("button", { text: meta.label, ...(cls ? { cls } : {}) }) as HTMLButtonElement;
+			const btn = rowEl.createEl("button", {
+				text: meta.label,
+				...(cls ? { cls } : {}),
+			}) as HTMLButtonElement;
 			btn.addEventListener("click", () => onSwap(meta.key));
 			buttons.set(meta.key, btn);
 		}

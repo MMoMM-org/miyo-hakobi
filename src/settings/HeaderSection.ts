@@ -52,12 +52,12 @@ function renderFundingLinks(
 	if (fundingUrl === undefined) return;
 
 	const createLink = (href: string, label: string): void => {
-		const any = parentEl as unknown as Record<string, unknown>;
-		const createEl = any["createEl"] as (
-			tag: string,
-			opts: { href: string; text: string; cls: string; attr: Record<string, string> },
-		) => HTMLElement;
-		createEl("a", {
+		(parentEl as unknown as {
+			createEl(
+				tag: string,
+				opts: { href: string; text: string; cls: string; attr: Record<string, string> },
+			): HTMLElement;
+		}).createEl("a", {
 			href,
 			text: label,
 			cls: "external-link",
@@ -82,12 +82,12 @@ function appendLink(
 	href: string,
 	text: string,
 ): HTMLElement {
-	const any = parentEl as unknown as Record<string, unknown>;
-	const createEl = any["createEl"] as (
-		tag: string,
-		opts: { href: string; text: string; cls: string; attr: Record<string, string> },
-	) => HTMLElement;
-	return createEl("a", {
+	return (parentEl as unknown as {
+		createEl(
+			tag: string,
+			opts: { href: string; text: string; cls: string; attr: Record<string, string> },
+		): HTMLElement;
+	}).createEl("a", {
 		href,
 		text,
 		cls: "external-link",
@@ -97,9 +97,9 @@ function appendLink(
 
 /** Appends a text-only span to parentEl using Obsidian's createSpan helper. */
 function appendText(parentEl: HTMLElement, content: string): void {
-	const any = parentEl as unknown as Record<string, unknown>;
-	const createSpan = any["createSpan"] as (opts: { text: string }) => HTMLElement;
-	createSpan({ text: content });
+	(parentEl as unknown as { createSpan(opts: { text: string }): HTMLElement }).createSpan({
+		text: content,
+	});
 }
 
 export class HeaderSection {
@@ -124,30 +124,28 @@ export class HeaderSection {
 	render(containerEl?: HTMLElement): void {
 		const { manifest } = this.plugin;
 		const target = containerEl ?? this.containerEl;
-		const containerAny = target as unknown as Record<string, unknown>;
 
-		// createDiv helper from Obsidian's augmented DOM (preferred over createEl("div"))
-		const createDiv = containerAny["createDiv"] as (opts?: {
-			cls?: string;
-			text?: string;
-		}) => HTMLElement;
+		// Obsidian's augmented DOM helpers are prototype methods that read `this`,
+		// so we MUST invoke them as methods on the element — yanking the function
+		// off the cast and calling it bare strips `this` and crashes at runtime.
+		const targetEl = target as unknown as {
+			createDiv(opts?: { cls?: string; text?: string }): HTMLElement;
+		};
 
-		// Outer wrapper
-		const header = createDiv({ cls: "hakobi-header" });
-		const headerAny = header as unknown as Record<string, unknown>;
-		const headerCreateEl = headerAny["createEl"] as (
-			tag: string,
-			opts?: { text?: string; cls?: string },
-		) => HTMLElement;
+		// Outer wrapper (createDiv preferred over createEl("div"))
+		const header = targetEl.createDiv({ cls: "hakobi-header" });
+		const headerEl = header as unknown as {
+			createEl(tag: string, opts?: { text?: string; cls?: string }): HTMLElement;
+		};
 
 		// Plugin name
-		headerCreateEl("h1", { text: manifest.name });
+		headerEl.createEl("h1", { text: manifest.name });
 
 		// Tagline / description
-		headerCreateEl("p", { text: manifest.description, cls: "hakobi-tagline" });
+		headerEl.createEl("p", { text: manifest.description, cls: "hakobi-tagline" });
 
 		// Meta line: author | repo | funding
-		const meta = headerCreateEl("p", { cls: "hakobi-meta" });
+		const meta = headerEl.createEl("p", { cls: "hakobi-meta" });
 
 		// Author link — only render an anchor if authorUrl is present; otherwise plain text
 		const authorName = parseAuthorDisplayName(manifest.author ?? "");

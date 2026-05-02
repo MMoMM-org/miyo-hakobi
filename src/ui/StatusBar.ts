@@ -53,8 +53,9 @@ export class StatusBar {
 		// Obsidian augments the status-bar element with createSpan; use it so the
 		// plugin follows the obsidianmd/prefer-create-el rule and works with popout
 		// windows (activeDocument compatibility is handled by Obsidian's augmentation).
-		const any = this.el as unknown as Record<string, unknown>;
-		(any["createSpan"] as (opts: { text: string }) => HTMLElement)({
+		// Invoke as a method so `this`-binding is preserved (createSpan is a
+		// prototype method that reads `this`).
+		(this.el as unknown as { createSpan(opts: { text: string }): HTMLElement }).createSpan({
 			text: "運",
 		});
 

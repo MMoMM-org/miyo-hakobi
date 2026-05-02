@@ -257,9 +257,11 @@ export class ExportSubtab {
 	// -------------------------------------------------------------------------
 
 	private _empty(containerEl: HTMLElement): void {
-		const any = containerEl as unknown as Record<string, unknown>;
-		if (typeof any["empty"] === "function") {
-			(any["empty"] as () => void)();
+		// Obsidian's empty() is a prototype method that reads `this`, so it must
+		// be invoked as a method on the element — bare calls strip `this` and crash.
+		const augmented = containerEl as unknown as { empty?: () => void };
+		if (typeof augmented.empty === "function") {
+			augmented.empty();
 		} else {
 			while (containerEl.firstChild) {
 				containerEl.removeChild(containerEl.firstChild);

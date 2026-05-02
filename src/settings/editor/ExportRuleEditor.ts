@@ -52,11 +52,13 @@ export interface ExportRuleEditorDeps {
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-/** Clear an Obsidian-augmented element, using the empty() helper when available. */
+/** Clear an Obsidian-augmented element, using the empty() helper when available.
+ * empty() is a prototype method that reads `this`, so it must be invoked as a
+ * method on the element — bare calls strip `this` and crash at runtime. */
 function emptyEl(el: HTMLElement): void {
-	const any = el as unknown as Record<string, unknown>;
-	if (typeof any["empty"] === "function") {
-		(any["empty"] as () => void)();
+	const augmented = el as unknown as { empty?: () => void };
+	if (typeof augmented.empty === "function") {
+		augmented.empty();
 	} else {
 		while (el.firstChild) el.removeChild(el.firstChild);
 	}

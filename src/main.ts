@@ -258,9 +258,13 @@ export default class HakobiPlugin extends Plugin {
     // 15. openInDefaultApp seam (GeneralSubtab)
     // ------------------------------------------------------------------
     const openInDefaultApp = async (absPath: string): Promise<void> => {
-      const appAny = this.app as unknown as Record<string, unknown>;
-      if (typeof appAny["openWithDefaultApp"] === "function") {
-        await (appAny["openWithDefaultApp"] as (p: string) => Promise<void>)(absPath);
+      // openWithDefaultApp is a prototype method on app that reads `this`, so
+      // it must be invoked as a method — bare calls strip `this` and crash.
+      const augmentedApp = this.app as unknown as {
+        openWithDefaultApp?: (p: string) => Promise<void>;
+      };
+      if (typeof augmentedApp.openWithDefaultApp === "function") {
+        await augmentedApp.openWithDefaultApp(absPath);
       } else {
         // Fallback: surface the path in a Notice
         Notices.transient(`Audit log path: ${absPath}`);
