@@ -214,7 +214,7 @@ inbound:
     type: in-process callbacks
     format: registered command handlers (addCommand)
     authentication: N/A
-    data_flow: "User triggers Run / Run-select / Export-this-note / dry-run variants."
+    data_flow: "User triggers Run / Run-select / dry-run variants."
 
   - name: "Obsidian Lifecycle"
     type: in-process method calls
@@ -425,7 +425,7 @@ graph TB
 │   │   └── VaultIo.ts                     # NEW: app.vault.* wrapper (read/write/list/by-tag/active-file)
 │   ├── ui/
 │   │   ├── StatusBar.ts                   # NEW: kanji 運 status-bar element + state machine
-│   │   ├── CommandRegistry.ts             # NEW: registers all 7 command-palette commands
+│   │   ├── CommandRegistry.ts             # NEW: registers all 6 command-palette commands
 │   │   └── Notices.ts                     # NEW: thin helpers for transient/persistent Notices
 │   └── types/
 │       └── index.ts                       # MODIFY: export Rule | DeviceState | GlobalSettings | AuditEntry types

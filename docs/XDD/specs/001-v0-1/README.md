@@ -67,7 +67,7 @@ In-scope (v0.1):
 - Simple per-rule `everyMinutes` scheduler (no daemon)
 - Filename sanitization on import
 - NDJSON audit log (metadata only) with built-in viewer in General settings tab
-- Command-palette commands: Run Import/Export All, Run Import/Export (select), Export This Note
+- Command-palette commands: Run Import/Export All, Run Import/Export (select), dry-run variants (six commands total)
 
 Out-of-scope (v0.1):
 - External surface, ports, MCP, LLM
