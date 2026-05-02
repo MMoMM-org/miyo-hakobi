@@ -103,7 +103,21 @@ const EXPECTED_AUDIT_FIELDS = [
 // Each F# is wired to AT LEAST ONE test file that exercises that requirement.
 // The compliance test asserts each listed file exists; the mapping itself is
 // the documented trace from PRD acceptance criteria to test coverage.
+//
+// Sentinel: an entry value of `["DEFERRED:<reason-tag>"]` records that the F#
+// was Could-Have and is intentionally unimplemented in v0.1. Sentinel rows
+// keep the F1..F12 mapping complete (every F# accounted for) but are skipped
+// by the file-on-disk existence assertion below — pointing at an unrelated
+// test file would be dishonest. F12 (file-menu integration) is the only
+// sentinel in v0.1; the deferral is documented in the spec README's Decisions
+// Log and surfaced to users in README.md "Possible future features".
 // ---------------------------------------------------------------------------
+
+const DEFERRED_PREFIX = "DEFERRED:";
+
+function isDeferred(entries: readonly string[]): boolean {
+	return entries.length === 1 && entries[0].startsWith(DEFERRED_PREFIX);
+}
 
 const F_MAPPING: Record<string, readonly string[]> = {
 	// F1 — Import rule (FS → vault)
@@ -144,10 +158,11 @@ const F_MAPPING: Record<string, readonly string[]> = {
 	F10: ["test/ui/StatusBar.test.ts"],
 	// F11 — Configurable per-file IO timeout (global)
 	F11: ["test/fs/NodeFs.test.ts"],
-	// F12 — File-menu integration (Could Have, deferred — covered by absence
-	//       in the won't-have section indirectly; mapped to a test that proves
-	//       the feature surface is at least the documented six-command set).
-	F12: ["test/ui/CommandRegistry.test.ts"],
+	// F12 — File-menu integration (Could Have, intentionally deferred to a
+	//       future release — see spec 001-v0-1 README Decisions Log + README.md
+	//       "Possible future features"). DEFERRED sentinel: the assertion loop
+	//       below skips file-on-disk checks for this row.
+	F12: [`${DEFERRED_PREFIX}file-menu-integration`],
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -437,19 +452,24 @@ describe("spec compliance — T4.7 final sweep", () => {
 	describe("PRD F1–F12 → test file mapping", () => {
 		const F_KEYS = Object.keys(F_MAPPING);
 
-		it("every F# in F1..F12 has at least one mapped test file", () => {
+		it("every F# in F1..F12 has at least one mapped test file or DEFERRED sentinel", () => {
 			for (let i = 1; i <= 12; i++) {
 				const key = `F${i}`;
 				expect(F_KEYS, `missing mapping for ${key}`).toContain(key);
 				expect(
 					F_MAPPING[key].length,
-					`${key} has zero mapped test files`,
+					`${key} has zero entries (need a test file or a DEFERRED sentinel)`,
 				).toBeGreaterThan(0);
 			}
 		});
 
-		it.each(F_KEYS)("%s — every mapped test file exists on disk", (fKey) => {
+		it.each(F_KEYS)("%s — every mapped test file exists on disk (DEFERRED sentinels skipped)", (fKey) => {
 			const files = F_MAPPING[fKey];
+			if (isDeferred(files)) {
+				// Sentinel row — no file-on-disk check; deferral is documented in
+				// the spec README's Decisions Log + README "Possible future features".
+				return;
+			}
 			for (const rel of files) {
 				expect(
 					fileExists(rel),

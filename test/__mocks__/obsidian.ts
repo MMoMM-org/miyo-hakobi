@@ -161,6 +161,42 @@ export class Modal {
 	onClose(): void {}
 }
 
+/**
+ * Minimal FuzzySuggestModal stub — supports subclassing so tests can drive
+ * the picker lifecycle. `open()` does NOT auto-select; tests choose by calling
+ * the protected `_chooseItem(item)` helper or by triggering close() to abort.
+ *
+ * Subclasses must implement `getItems()`, `getItemText(item)`, `onChooseItem(item)`.
+ * The base class wires `open()` → `onOpen()` and `close()` → `onClose()` via Modal.
+ */
+export class FuzzySuggestModal<T> extends Modal {
+	private _placeholder?: string;
+
+	setPlaceholder(text: string): this {
+		this._placeholder = text;
+		return this;
+	}
+
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
+	getItems(): T[] {
+		return [];
+	}
+
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
+	getItemText(_item: T): string {
+		return "";
+	}
+
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
+	onChooseItem(_item: T, _evt?: MouseEvent | KeyboardEvent): void {}
+
+	/** Test helper — simulate the user picking an item, then closing. */
+	_chooseItem(item: T): void {
+		this.onChooseItem(item);
+		this.close();
+	}
+}
+
 export class Notice {
 	static _instances: Notice[] = [];
 	constructor(

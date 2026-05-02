@@ -17,11 +17,15 @@
 //   not learn about them until the user reloads the plugin or restarts Obsidian.
 //   A Phase 4 task will wire scheduler.onRuleChanged from subtab onSave closures.
 //
-// Known limitation (Phase 4 follow-up):
-//   The chooseFsFolder seam for ImportRuleEditor / ExportRuleEditor is wired with
-//   a Notice-based no-op fallback ("Folder picker not implemented in this build.")
-//   because Electron's dialog.showOpenDialog requires import access that varies
-//   by Obsidian version. Full Electron wiring is a Phase 4 concern.
+// chooseFsFolder seam:
+//   The folder picker is wired to Electron's dialog.showOpenDialog via the
+//   renderer's runtime require(). We try `electron.remote.dialog` first
+//   (older Electron builds) and fall back to `@electron/remote` (Electron 9+,
+//   where remote was moved out-of-process). If neither is available — for
+//   example a future Obsidian build that disables remote entirely — the seam
+//   surfaces a Notice instead of throwing. The `electron` module is marked
+//   `external` in esbuild.config.mjs so nothing is bundled; the call resolves
+//   via Obsidian's renderer at runtime only.
 
 import { Plugin, Menu } from "obsidian";
 
@@ -37,6 +41,7 @@ import { ImportRunner } from "./runner/ImportRunner";
 import { ExportRunner } from "./runner/ExportRunner";
 import { StatusBar } from "./ui/StatusBar";
 import { CommandRegistry } from "./ui/CommandRegistry";
+import { RulePickerModal } from "./ui/RulePickerModal";
 import * as Notices from "./ui/Notices";
 import { HeaderSection } from "./settings/HeaderSection";
 import { GeneralSubtab, ConfirmModal } from "./settings/subtabs/GeneralSubtab";
@@ -245,13 +250,45 @@ export default class HakobiPlugin extends Plugin {
     };
 
     // ------------------------------------------------------------------
-    // 14. chooseFsFolder seam (Phase 4: wire Electron dialog)
+    // 14. chooseFsFolder seam — Electron dialog.showOpenDialog
     // ------------------------------------------------------------------
+    // Resolves Electron's dialog via the renderer's runtime require chain:
+    //   1. `electron.remote.dialog`     — older Electron builds
+    //   2. `@electron/remote`.dialog    — Electron 9+ (remote moved out-of-process)
+    // If neither is available (future Obsidian build with remote disabled),
+    // we surface a Notice instead of throwing. The `electron` module is
+    // declared `external` in esbuild config so nothing is bundled; the
+    // require executes at runtime inside Obsidian's renderer only.
+    type OpenDialogFn = (opts: { properties: string[] }) => Promise<{
+      canceled: boolean;
+      filePaths: string[];
+    }>;
     const chooseFsFolder = async (): Promise<string | undefined> => {
-      // TODO (Phase 4): wire Electron's dialog.showOpenDialog here.
-      // For now, surface a Notice so the user knows what is missing.
-      Notices.transient("Folder picker not implemented in this build.");
-      return undefined;
+      const reqFn = (window as unknown as { require?: (m: string) => unknown }).require;
+      let dialog: { showOpenDialog: OpenDialogFn } | undefined;
+      try {
+        const electron = reqFn?.("electron") as
+          | { remote?: { dialog?: { showOpenDialog: OpenDialogFn } } }
+          | undefined;
+        dialog = electron?.remote?.dialog;
+        if (!dialog) {
+          const remote = reqFn?.("@electron/remote") as
+            | { dialog?: { showOpenDialog: OpenDialogFn } }
+            | undefined;
+          dialog = remote?.dialog;
+        }
+      } catch {
+        // require missing or module not present — fall through to the Notice.
+      }
+      if (!dialog) {
+        Notices.transient("Folder picker unavailable in this Obsidian build.");
+        return undefined;
+      }
+      const result = await dialog.showOpenDialog({
+        properties: ["openDirectory"],
+      });
+      if (result.canceled || result.filePaths.length === 0) return undefined;
+      return result.filePaths[0];
     };
 
     // ------------------------------------------------------------------
@@ -383,13 +420,16 @@ export default class HakobiPlugin extends Plugin {
     });
 
     // ------------------------------------------------------------------
-    // 21. CommandRegistry
+    // 21. CommandRegistry — `selectRule` seam wired to RulePickerModal so
+    //     the four "Run an import/export rule…" + "Dry-run an import/export
+    //     rule…" commands actually present a fuzzy picker instead of no-op'ing.
     // ------------------------------------------------------------------
     const commandRegistry = new CommandRegistry({
       plugin: this,
       scheduler: this.scheduler,
       ruleStore,
       notices: Notices,
+      selectRule: (rules) => RulePickerModal.pick(this.app, rules, "Pick a rule"),
     });
     commandRegistry.registerAll();
 

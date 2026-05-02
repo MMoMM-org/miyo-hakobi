@@ -189,6 +189,7 @@ Hakobi is local-first with no telemetry, no analytics, and no network surfaces. 
 These are ideas that have been considered but are not committed to any release. No promises, no timelines.
 
 - **Export the active note via a chosen rule** — one-shot active-note export with a fuzzy-suggester modal that lists configured export rules. Currently you can configure a `type: note` export rule for any specific note and run it via `Run an export rule…`.
+- **File-menu integration (`Export via rule…`)** — a right-click entry on notes in the file explorer that lists configured export rules and runs the chosen one against that note. Equivalent reach as the command-palette flow but discoverable from the explorer. Was tracked as PRD F12 (Could-Have) in v0.1 and intentionally deferred.
 
 ## Development
 
