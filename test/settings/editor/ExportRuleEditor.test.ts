@@ -39,7 +39,7 @@ function makeDeps(overrides?: Partial<ExportRuleEditorDeps>): ExportRuleEditorDe
 		vaultRoot: "/vault",
 		pluginDir: "/vault/.obsidian/plugins/miyo-hakobi",
 		chooseFsFolder: vi.fn(async () => "/some/external/folder"),
-		vaultFolderSuggester: vi.fn(),
+		chooseVaultFolder: vi.fn(async () => undefined),
 		notePathSuggester: vi.fn(),
 		newRuleId: () => makeRuleId("generated-id"),
 		...overrides,
@@ -620,6 +620,36 @@ describe("ExportRuleEditor", () => {
 		await vi.waitFor(() => expect(localDeps.ruleStore.add).toHaveBeenCalled());
 		const addCall = vi.mocked(localDeps.ruleStore.add).mock.calls[0]?.[0] as ExportFolderRule;
 		expect(addCall.destinationPath).toBe("/users/m/exports");
+	});
+
+	// -------------------------------------------------------------------------
+	// chooseVaultFolder seam: clicking Pick on the source vault folder field
+	// calls the seam and updates the sourceVaultPath input.
+	// -------------------------------------------------------------------------
+
+	it("clicking Pick on Source vault folder calls chooseVaultFolder and updates the input", async () => {
+		const chooseVaultFolder = vi.fn(async () => "Notes/Projects");
+		const localDeps = makeDeps({ chooseVaultFolder });
+		const editor = new ExportRuleEditor(localDeps);
+		editor.renderForCreate(container, vi.fn());
+
+		const srcInput = container.querySelector<HTMLInputElement>(
+			'input[data-field="sourceVaultPath"]',
+		);
+		expect(srcInput, "source vault path input").toBeTruthy();
+		expect(srcInput!.value).toBe("");
+
+		const pickBtn = container.querySelector<HTMLButtonElement>(
+			'button[data-action="pick-source-vault"]',
+		);
+		expect(pickBtn, "pick source vault folder button must exist").toBeTruthy();
+		pickBtn!.click();
+
+		await vi.waitFor(() => expect(chooseVaultFolder).toHaveBeenCalledOnce());
+
+		expect(srcInput!.value, "source vault path input reflects chosen path").toBe(
+			"Notes/Projects",
+		);
 	});
 
 	// -------------------------------------------------------------------------

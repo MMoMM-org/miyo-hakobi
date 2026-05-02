@@ -198,6 +198,35 @@ describe("ImportRuleEditor", () => {
 	});
 
 	// -----------------------------------------------------------------------
+	// chooseVaultFolder seam: clicking Pick calls the seam once and populates
+	// the destinationVaultPath input.
+	// -----------------------------------------------------------------------
+
+	it("clicking Pick calls chooseVaultFolder and populates destinationVaultPath input", async () => {
+		const chooseVaultFolder = vi.fn(async () => "Inbox/voice");
+		const localDeps = makeDeps({ chooseVaultFolder });
+		const localEditor = new ImportRuleEditor(localDeps);
+		localEditor.renderForCreate(container, vi.fn());
+
+		const pickBtn = container.querySelector<HTMLButtonElement>(
+			'button[data-action="pick-destination"]',
+		)!;
+		expect(pickBtn, "pick destination button").toBeTruthy();
+
+		pickBtn.click();
+		// Allow the async chooseVaultFolder promise chain to resolve
+		await Promise.resolve();
+		await Promise.resolve();
+
+		expect(chooseVaultFolder).toHaveBeenCalledOnce();
+
+		const destInput = container.querySelector<HTMLInputElement>(
+			'input[data-field="destinationVaultPath"]',
+		)!;
+		expect(destInput.value).toBe("Inbox/voice");
+	});
+
+	// -----------------------------------------------------------------------
 	// T3.6.3 — Save initially disabled (required fields empty)
 	// -----------------------------------------------------------------------
 

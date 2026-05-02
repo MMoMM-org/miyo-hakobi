@@ -42,6 +42,7 @@ import { ExportRunner } from "./runner/ExportRunner";
 import { StatusBar } from "./ui/StatusBar";
 import { CommandRegistry } from "./ui/CommandRegistry";
 import { RulePickerModal } from "./ui/RulePickerModal";
+import { VaultFolderPickerModal } from "./ui/VaultFolderPickerModal";
 import * as Notices from "./ui/Notices";
 import { HeaderSection } from "./settings/HeaderSection";
 import { GeneralSubtab, ConfirmModal } from "./settings/subtabs/GeneralSubtab";
@@ -137,7 +138,12 @@ export default class HakobiPlugin extends Plugin {
         write: (p: string, d: string) => vaultAdapter.write(p, d),
         exists: (p: string) => vaultAdapter.exists(p),
       },
-      pluginDataDir: `${vaultRoot}/${pluginDataDir}`,
+      // app.vault.adapter is a vault-relative API — it prepends the vault root
+      // to every path internally. Pass the vault-relative pluginDataDir so the
+      // adapter does not produce a doubled path (e.g. <vault>/<vault>/...) when
+      // writing device.json. See Constitution / Operations: data lives at
+      // ".obsidian/plugins/miyo-hakobi/device.json" (vault-relative).
+      pluginDataDir,
     });
 
     // ------------------------------------------------------------------
@@ -331,12 +337,16 @@ export default class HakobiPlugin extends Plugin {
     // ------------------------------------------------------------------
     // 17. Rule editors
     // ------------------------------------------------------------------
+    const chooseVaultFolder = (): Promise<string | undefined> =>
+      VaultFolderPickerModal.pick(this.app, "Pick a vault folder");
+
     const importRuleEditor = new ImportRuleEditor({
       ruleStore,
       deviceStore,
       vaultRoot,
       pluginDir: pluginDataDir,
       chooseFsFolder,
+      chooseVaultFolder,
     });
 
     const exportRuleEditor = new ExportRuleEditor({
@@ -345,6 +355,7 @@ export default class HakobiPlugin extends Plugin {
       vaultRoot,
       pluginDir: pluginDataDir,
       chooseFsFolder,
+      chooseVaultFolder,
     });
 
     // ------------------------------------------------------------------

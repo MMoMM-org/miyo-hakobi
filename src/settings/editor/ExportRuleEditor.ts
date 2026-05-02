@@ -40,8 +40,14 @@ export interface ExportRuleEditorDeps {
 	pluginDir: string;
 	/** Optional: opens an OS folder picker and returns the chosen path. */
 	chooseFsFolder?: () => Promise<string | undefined>;
-	/** Optional: wires an Obsidian folder suggester to a text input. */
-	vaultFolderSuggester?: (input: HTMLInputElement, currentValue: string) => void;
+	/**
+	 * Optional vault folder picker. Returns the chosen folder's vault-relative
+	 * path (the vault root resolves to ""), or undefined if the user closed
+	 * without choosing. Wired in main.ts to VaultFolderPickerModal.pick(...).
+	 * When absent, the source-folder field is a plain text input — acceptable
+	 * for environments without a modal harness (e.g. some unit tests).
+	 */
+	chooseVaultFolder?: () => Promise<string | undefined>;
 	/** Optional: wires an Obsidian note-path suggester to a text input. */
 	notePathSuggester?: (input: HTMLInputElement, currentValue: string) => void;
 	/** Injectable rule-ID generator — defaults to newRuleId(). */
@@ -215,10 +221,13 @@ export class ExportRuleEditor {
 			emptyEl(pickerWrapper);
 
 			if (sourceType === "folder") {
+				let srcVaultInputEl: HTMLInputElement | undefined;
 				new Setting(pickerWrapper)
 					.setName("Source vault folder")
 					.setDesc("Vault-relative path to export (e.g. Notes/projects).")
 					.addText((text) => {
+						srcVaultInputEl = text.inputEl;
+						text.inputEl.setAttribute("data-field", "sourceVaultPath");
 						text
 							.setPlaceholder("Notes/projects")
 							.setValue(sourceVaultPath)
@@ -226,9 +235,20 @@ export class ExportRuleEditor {
 								sourceVaultPath = v;
 								refreshSave();
 							});
-						if (this.deps.vaultFolderSuggester) {
-							this.deps.vaultFolderSuggester(text.inputEl, sourceVaultPath);
-						}
+					})
+					.addButton((btn) => {
+						btn.buttonEl.setAttribute("data-action", "pick-source-vault");
+						btn.setButtonText("Pick").onClick(async () => {
+							if (!this.deps.chooseVaultFolder) return;
+							const chosen = await this.deps.chooseVaultFolder();
+							if (chosen === undefined) return;
+							sourceVaultPath = chosen;
+							if (srcVaultInputEl !== undefined) {
+								srcVaultInputEl.value = chosen;
+								srcVaultInputEl.dispatchEvent(new Event("input"));
+							}
+							refreshSave();
+						});
 					});
 			} else if (sourceType === "tag") {
 				new Setting(pickerWrapper)

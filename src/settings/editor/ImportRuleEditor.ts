@@ -45,11 +45,13 @@ export interface ImportRuleEditorDeps {
 	 */
 	chooseFsFolder?: () => Promise<string | undefined>;
 	/**
-	 * Optional vault folder suggester hook — called with the input element and
-	 * the current value so callers can wire an Obsidian FuzzySuggestModal.
-	 * When absent, the destination field is a plain text input (acceptable for v0.1).
+	 * OS-style vault folder picker. Returns the chosen folder's vault-relative
+	 * path (the vault root resolves to ""), or undefined if the user closed
+	 * without choosing. Wired in main.ts to VaultFolderPickerModal.pick(...).
+	 * When absent, the destination field is a plain text input — acceptable for
+	 * environments without a modal harness (e.g. some unit tests).
 	 */
-	vaultFolderSuggester?: (input: HTMLInputElement, currentValue: string) => void;
+	chooseVaultFolder?: () => Promise<string | undefined>;
 	/**
 	 * Injectable RuleId factory for deterministic tests. Defaults to
 	 * crypto.randomUUID() per ADR-7.
@@ -253,7 +255,7 @@ export class ImportRuleEditor {
 				});
 			});
 
-		// --- Field: Destination (vault-relative) ---
+		// --- Field: Destination (vault-relative) + Pick button ---
 		new Setting(containerEl)
 			.setName("Destination in vault")
 			.setDesc("Vault-relative folder path (e.g. Inbox/voice).")
@@ -261,12 +263,28 @@ export class ImportRuleEditor {
 				const input = text.inputEl;
 				input.setAttribute("data-field", "destinationVaultPath");
 				text.setValue(state.destinationVaultPath);
-				if (this.deps.vaultFolderSuggester) {
-					this.deps.vaultFolderSuggester(input, state.destinationVaultPath);
-				}
 				text.onChange((value) => {
 					state.destinationVaultPath = value;
 					revalidate();
+				});
+			})
+			.addButton((btn) => {
+				btn.buttonEl.setAttribute("data-action", "pick-destination");
+				btn.setButtonText("Pick").onClick(() => {
+					const picker = this.deps.chooseVaultFolder;
+					if (picker === undefined) return;
+					void picker().then((chosen) => {
+						if (chosen === undefined) return;
+						state.destinationVaultPath = chosen;
+						const destInput = containerEl.querySelector<HTMLInputElement>(
+							'input[data-field="destinationVaultPath"]',
+						);
+						if (destInput) {
+							destInput.value = chosen;
+							destInput.dispatchEvent(new Event("input"));
+						}
+						revalidate();
+					});
 				});
 			});
 
