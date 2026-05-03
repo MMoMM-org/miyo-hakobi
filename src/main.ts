@@ -447,6 +447,29 @@ export default class HakobiPlugin extends Plugin {
     // ------------------------------------------------------------------
     await this.scheduler.start();
 
+    // ------------------------------------------------------------------
+    // 24. Initial run on plugin start — fire one tick per enabled rule
+    //     so the user sees activity right after enabling/installing
+    //     instead of waiting for the next interval boundary.
+    //
+    // Gated behind workspace.onLayoutReady + a short grace delay so the
+    // metadata cache has time to populate (otherwise tag-export rules
+    // would see an empty cache and silently produce no files). Fire-and-
+    // forget — onload() must return promptly so Obsidian doesn't stall.
+    // ------------------------------------------------------------------
+    const INITIAL_RUN_GRACE_MS = 3000;
+    this.app.workspace.onLayoutReady(() => {
+      const timeoutId = window.setTimeout(() => {
+        this.scheduler.runInitialRun().catch((err: unknown) => {
+          console.error("[Hakobi] initial run failed:", err);
+        });
+      }, INITIAL_RUN_GRACE_MS);
+      // Clear the timeout if the plugin unloads before the grace period
+      // elapses — otherwise the runInitialRun would fire after onunload(),
+      // racing with scheduler.stop() and any teardown.
+      this.register(() => window.clearTimeout(timeoutId));
+    });
+
     // Trigger initial rotation check (best-effort — errors are swallowed so a
     // missing audit directory on first run does not surface as an unhandled
     // rejection).

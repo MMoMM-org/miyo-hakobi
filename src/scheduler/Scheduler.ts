@@ -112,6 +112,29 @@ export class Scheduler {
 	}
 
 	// -------------------------------------------------------------------------
+	// runInitialRun() — fire one tick per enabled rule on plugin start, so the
+	// user sees activity immediately instead of waiting a full everyMinutes
+	// interval. The grace period (waiting for layout/metadata to settle) is
+	// orchestrated by the caller — this method just runs the ticks once each,
+	// sequentially, respecting the in-flight registry.
+	//
+	// Intentionally separate from start() because:
+	//   1. start() must return quickly so Plugin.onload() doesn't block, but
+	//      the initial run can take seconds (per-rule I/O).
+	//   2. The caller (main.ts) wants to gate this behind onLayoutReady +
+	//      grace period; that orchestration doesn't belong in the Scheduler.
+	// -------------------------------------------------------------------------
+
+	async runInitialRun(): Promise<void> {
+		const { rules } = await this.ruleStore.load();
+		for (const rule of rules) {
+			const enabled = await this.deviceStore.isEnabled(rule.id);
+			if (!enabled) continue;
+			await this.executeTick(rule, false);
+		}
+	}
+
+	// -------------------------------------------------------------------------
 	// stop() — cancel all active timers
 	// -------------------------------------------------------------------------
 

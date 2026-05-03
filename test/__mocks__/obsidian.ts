@@ -89,6 +89,10 @@ export class App {
 		off: vi.fn(),
 		getLeavesOfType: vi.fn(() => []),
 		openLinkText: vi.fn(async () => {}),
+		// Real Obsidian invokes the callback once the workspace layout is
+		// available. The mock fires it synchronously so onload() code paths
+		// that schedule work behind onLayoutReady are exercised by tests.
+		onLayoutReady: vi.fn((cb: () => void) => cb()),
 	};
 	metadataCache = {
 		getFileCache: vi.fn((_file: TFile): CachedMetadata | null => null),

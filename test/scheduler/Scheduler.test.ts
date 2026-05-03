@@ -805,4 +805,103 @@ describe("Scheduler", () => {
 			expect(importRunner.run).toHaveBeenCalledTimes(1);
 		});
 	});
+
+	// -------------------------------------------------------------------------
+	// runInitialRun() — Bug 2B: fire one tick per enabled rule on plugin start
+	// so users see something happen instead of waiting a full interval.
+	// -------------------------------------------------------------------------
+
+	describe("runInitialRun()", () => {
+		it("invokes the appropriate runner once per enabled rule", async () => {
+			const importRule = makeImportRule({ everyMinutes: 5 });
+			const exportRule = makeExportRule({ everyMinutes: 10 });
+			const importRunner = makeImportRunner();
+			const exportRunner = makeExportRunner();
+			const enabledIds = new Set([importRule.id, exportRule.id]);
+			const { scheduler } = buildScheduler({
+				plugin,
+				rules: [importRule, exportRule],
+				enabledIds,
+				importRunner,
+				exportRunner,
+			});
+
+			await scheduler.start();
+			await scheduler.runInitialRun();
+
+			expect(importRunner.run).toHaveBeenCalledTimes(1);
+			expect(importRunner.run).toHaveBeenCalledWith(importRule, { dryRun: false });
+			expect(exportRunner.run).toHaveBeenCalledTimes(1);
+			expect(exportRunner.run).toHaveBeenCalledWith(exportRule, { dryRun: false });
+		});
+
+		it("skips disabled rules", async () => {
+			const enabledRule = makeImportRule({ name: "Enabled" });
+			const disabledRule = makeImportRule({ name: "Disabled" });
+			const importRunner = makeImportRunner();
+			const enabledIds = new Set([enabledRule.id]);
+			const { scheduler } = buildScheduler({
+				plugin,
+				rules: [enabledRule, disabledRule],
+				enabledIds,
+				importRunner,
+			});
+
+			await scheduler.start();
+			await scheduler.runInitialRun();
+
+			expect(importRunner.run).toHaveBeenCalledTimes(1);
+			expect(importRunner.run).toHaveBeenCalledWith(enabledRule, { dryRun: false });
+		});
+
+		it("respects in-flight registry (no overlap with a concurrent timer tick)", async () => {
+			const importRule = makeImportRule({ everyMinutes: 5 });
+			const importRunner = makeImportRunner();
+			const inFlight = new InFlightRegistry();
+			// Simulate that a tick is already running for this rule
+			inFlight.tryAcquire(importRule.id);
+
+			const auditLog = makeAuditLog();
+			const { scheduler } = buildScheduler({
+				plugin,
+				rules: [importRule],
+				enabledIds: new Set([importRule.id]),
+				importRunner,
+				inFlight,
+				auditLog,
+			});
+
+			await scheduler.start();
+			await scheduler.runInitialRun();
+
+			// runner should NOT be invoked because the in-flight slot is already taken
+			expect(importRunner.run).not.toHaveBeenCalled();
+			// and an overlap audit entry should be appended
+			const overlapEntries = auditLog.append.mock.calls.filter(
+				(c) => (c[0] as AuditEntry).errorCode === "overlap",
+			);
+			expect(overlapEntries.length).toBe(1);
+		});
+
+		it("does not interfere with the periodic timer (initial tick is one-shot)", async () => {
+			const importRule = makeImportRule({ everyMinutes: 5 });
+			const importRunner = makeImportRunner();
+			const { scheduler } = buildScheduler({
+				plugin,
+				rules: [importRule],
+				enabledIds: new Set([importRule.id]),
+				importRunner,
+			});
+
+			await scheduler.start();
+			await scheduler.runInitialRun();
+			expect(importRunner.run).toHaveBeenCalledTimes(1);
+
+			// 5 minutes later, the regular interval should fire its own tick
+			vi.advanceTimersByTime(5 * 60 * 1000);
+			await Promise.resolve();
+			await Promise.resolve();
+			expect(importRunner.run).toHaveBeenCalledTimes(2);
+		});
+	});
 });
