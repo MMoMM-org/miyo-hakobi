@@ -42,6 +42,7 @@ import {
   resolveCollisionName,
   writeFsBinaryAtomic,
 } from "./AtomicWriter";
+import { mapScopeViolationToErrorCode } from "./errorCodeMapping";
 
 // ---------------------------------------------------------------------------
 // Deps shape (constructor DI)
@@ -120,7 +121,11 @@ export class ExportRunner {
     // Step 1: scope validation.
     const scopeResult = await this.validateScope(rule);
     if (!scopeResult.ok) {
-      await this.appendRuleFailed(rule, ts, "forbidden-path");
+      await this.appendRuleFailed(
+        rule,
+        ts,
+        mapScopeViolationToErrorCode(scopeResult.errors.reason),
+      );
       return;
     }
 

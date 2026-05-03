@@ -18,7 +18,7 @@
 // (e.g. readBinary(): Promise<Buffer>) and update the write path here accordingly.
 
 import { sanitizeFilename } from "../domain/sanitize";
-import { type ImportRule, assertNever } from "../domain/rule";
+import { type ImportRule } from "../domain/rule";
 import type { Result } from "../domain/rule";
 import {
   type ScopeViolation,
@@ -34,6 +34,7 @@ import {
 } from "../fs/NodeFs";
 import type { VaultIo } from "../vault/VaultIo";
 import { resolveCollisionName, writeVaultAtomic } from "./AtomicWriter";
+import { mapScopeViolationToErrorCode } from "./errorCodeMapping";
 import type { AuditLog } from "../audit/AuditLog";
 import type { AuditEntry, ErrorCode } from "../audit/AuditEntry";
 
@@ -609,19 +610,6 @@ function buildDestSubpath(
     return `${dest}/${sanitizedName}`;
   }
   return `${dest}/${sourceRelDir}/${sanitizedName}`;
-}
-
-function mapScopeViolationToErrorCode(reason: ScopeViolation["reason"]): ErrorCode {
-  switch (reason) {
-    case "vault-loop": return "loop-refused";
-    case "forbidden-path": return "forbidden-path";
-    case "symlink": return "source-is-symlink";
-    case "escape": return "forbidden-path";
-    case "traversal": return "forbidden-path";
-    case "absolute-in-filename": return "forbidden-path";
-  }
-  // Exhaustiveness guard — a new ScopeViolationReason variant is a compile error here.
-  assertNever(reason);
 }
 
 function mapIoErrorCode(code: string): ErrorCode {

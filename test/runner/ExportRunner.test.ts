@@ -601,6 +601,30 @@ describe("ExportRunner — scope validation", () => {
     const failures = audit._entries.filter((e) => e.decision === "rule-failed");
     expect(failures.length).toBeGreaterThan(0);
   });
+
+  // Regression: ExportRunner used to map ALL ScopeViolation reasons to
+  // errorCode "forbidden-path", losing the actual cause in the audit log.
+  // Each reason must surface its specific errorCode so users can debug.
+  it.each([
+    { reason: "vault-loop" as const,           expected: "loop-refused" },
+    { reason: "forbidden-path" as const,       expected: "forbidden-path" },
+    { reason: "symlink" as const,              expected: "source-is-symlink" },
+    { reason: "escape" as const,               expected: "forbidden-path" },
+    { reason: "traversal" as const,            expected: "forbidden-path" },
+    { reason: "absolute-in-filename" as const, expected: "forbidden-path" },
+  ])("maps ScopeViolation reason '$reason' to errorCode '$expected'",
+    async ({ reason, expected }) => {
+      const violation: ScopeViolation = { reason, path: "/x", detail: "test" };
+      const scopeValidator = makeScopeValidator({ ok: false, errors: violation });
+      const audit = makeAuditStub();
+      const { runner } = makeRunner({ scopeValidator, audit });
+
+      await runner.run(makeFolderRule());
+
+      const failure = audit._entries.find((e) => e.decision === "rule-failed");
+      expect(failure?.errorCode).toBe(expected);
+    },
+  );
 });
 
 // ---------------------------------------------------------------------------
