@@ -86,6 +86,8 @@ function makeDeps(
 
 	const scheduler: ImportSubtabDeps["scheduler"] = {
 		runOnce: vi.fn(async () => {}),
+		onRuleChanged: vi.fn(async () => {}),
+		onRuleRemoved: vi.fn(() => {}),
 	};
 
 	const importRuleEditor: ImportSubtabDeps["importRuleEditor"] = {
@@ -587,5 +589,143 @@ describe("ImportSubtab", () => {
 
 		expect(deps.notices.transient).toHaveBeenCalledOnce();
 		expect((deps.notices.transient as MockedFunction<typeof deps.notices.transient>).mock.calls[0][0]).toMatch(/Dry-running rule/i);
+	});
+
+	// -------------------------------------------------------------------------
+	// Bug 3 — Subtab → Scheduler wiring
+	//
+	// The Scheduler used to learn about new/changed/removed rules only on
+	// plugin reload. Until then, freshly created rules sat dormant in
+	// data.json and never produced a tick. These tests pin the wiring:
+	// every mutation path (create / edit / toggle / delete) must inform
+	// the Scheduler immediately.
+	// -------------------------------------------------------------------------
+
+	it("create flow: invokes scheduler.onRuleChanged with the freshly created rule", async () => {
+		const created = makeImportRule({ name: "Brand new rule" });
+		const editor: ImportSubtabDeps["importRuleEditor"] = {
+			renderForCreate: vi.fn((_c, onDone) => onDone(created)),
+			renderForEdit: vi.fn(),
+		};
+		const deps = makeDeps({ importRuleEditor: editor });
+
+		const subtab = new ImportSubtab(deps);
+		subtab.render(containerEl);
+		await flush();
+
+		// Empty state shows a single "+ add import rule" button — click it
+		const addBtn = containerEl.querySelector<HTMLButtonElement>("button")!;
+		addBtn.click();
+		await flush();
+
+		expect(deps.scheduler.onRuleChanged).toHaveBeenCalledWith(created);
+	});
+
+	it("edit flow: invokes scheduler.onRuleChanged with the updated rule", async () => {
+		const original = makeImportRule({ name: "Before" });
+		const updated = makeImportRule({ name: "After" });
+		const editor: ImportSubtabDeps["importRuleEditor"] = {
+			renderForCreate: vi.fn(),
+			renderForEdit: vi.fn((_c, _r, onDone) => onDone(updated)),
+		};
+		const deps = makeDeps({
+			importRuleEditor: editor,
+			ruleStore: {
+				load: vi.fn(async () => ({ rules: [original] as Rule[] })),
+				remove: vi.fn(async () => [] as Rule[]),
+			},
+		});
+
+		const subtab = new ImportSubtab(deps);
+		subtab.render(containerEl);
+		await flush();
+
+		const overflowBtn = containerEl.querySelector<HTMLButtonElement>(
+			'button[data-action="overflow"]',
+		)!;
+		overflowBtn.click();
+		clickOverflowItem(
+			deps.openOverflowMenu as MockedFunction<ImportSubtabDeps["openOverflowMenu"]>,
+			"Edit",
+		);
+		await flush();
+
+		expect(deps.scheduler.onRuleChanged).toHaveBeenCalledWith(updated);
+	});
+
+	it("delete flow (confirmed): invokes scheduler.onRuleRemoved with the rule id", async () => {
+		const rule = makeImportRule();
+		const deps = makeDeps({
+			ruleStore: {
+				load: vi.fn(async () => ({ rules: [rule] as Rule[] })),
+				remove: vi.fn(async () => [] as Rule[]),
+			},
+		});
+
+		const subtab = new ImportSubtab(deps);
+		subtab.render(containerEl);
+		await flush();
+
+		const overflowBtn = containerEl.querySelector<HTMLButtonElement>(
+			'button[data-action="overflow"]',
+		)!;
+		overflowBtn.click();
+		clickOverflowItem(
+			deps.openOverflowMenu as MockedFunction<ImportSubtabDeps["openOverflowMenu"]>,
+			"Delete",
+		);
+		await flush();
+
+		expect(deps.scheduler.onRuleRemoved).toHaveBeenCalledWith(rule.id);
+	});
+
+	it("delete flow (cancelled): does NOT invoke scheduler.onRuleRemoved", async () => {
+		const rule = makeImportRule();
+		const deps = makeDeps({
+			ruleStore: {
+				load: vi.fn(async () => ({ rules: [rule] as Rule[] })),
+				remove: vi.fn(async () => [] as Rule[]),
+			},
+			confirm: vi.fn(async () => false),
+		});
+
+		const subtab = new ImportSubtab(deps);
+		subtab.render(containerEl);
+		await flush();
+
+		const overflowBtn = containerEl.querySelector<HTMLButtonElement>(
+			'button[data-action="overflow"]',
+		)!;
+		overflowBtn.click();
+		clickOverflowItem(
+			deps.openOverflowMenu as MockedFunction<ImportSubtabDeps["openOverflowMenu"]>,
+			"Delete",
+		);
+		await flush();
+
+		expect(deps.scheduler.onRuleRemoved).not.toHaveBeenCalled();
+	});
+
+	it("toggle flow: invokes scheduler.onRuleChanged with the rule after setEnabled", async () => {
+		const rule = makeImportRule();
+		const deps = makeDeps({
+			ruleStore: {
+				load: vi.fn(async () => ({ rules: [rule] as Rule[] })),
+				remove: vi.fn(async () => [] as Rule[]),
+			},
+		});
+
+		const subtab = new ImportSubtab(deps);
+		subtab.render(containerEl);
+		await flush();
+
+		const toggleEl = containerEl.querySelector<HTMLElement>(
+			'[role="switch"]',
+		)!;
+		toggleEl.click();
+		await flush();
+
+		expect(deps.deviceStore.setEnabled).toHaveBeenCalledWith(rule.id, true);
+		expect(deps.scheduler.onRuleChanged).toHaveBeenCalledWith(rule);
 	});
 });

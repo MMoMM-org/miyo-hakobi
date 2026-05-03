@@ -41,6 +41,11 @@ export interface ImportSubtabDeps {
 	};
 	scheduler: {
 		runOnce(id: RuleId, opts?: { dryRun?: boolean }): Promise<void>;
+		// onRuleChanged / onRuleRemoved keep the in-memory timer table in sync
+		// with rule mutations from the UI. Without these calls, freshly created
+		// or edited rules stay dormant until the plugin reloads.
+		onRuleChanged(rule: Rule): Promise<void>;
+		onRuleRemoved(id: RuleId): void;
 	};
 	importRuleEditor: {
 		renderForCreate(
@@ -131,8 +136,10 @@ export class ImportSubtab {
 				(created) => {
 					// Rerender the whole subtab regardless of whether the user saved or
 					// cancelled — this handles both "rule now exists" and "still empty".
+					if (created !== undefined) {
+						void this.deps.scheduler.onRuleChanged(created);
+					}
 					void this.loadAndRender(containerEl);
-					void created; // creation is persisted by the editor; we just reload
 				},
 			);
 		});
@@ -153,7 +160,10 @@ export class ImportSubtab {
 		addBtn.addEventListener("click", () => {
 			// Inline-expand pattern: clear the body and render the editor.
 			this.clearContainer(containerEl);
-			this.deps.importRuleEditor.renderForCreate(containerEl, () => {
+			this.deps.importRuleEditor.renderForCreate(containerEl, (created) => {
+				if (created !== undefined) {
+					void this.deps.scheduler.onRuleChanged(created);
+				}
 				void this.loadAndRender(containerEl);
 			});
 		});
@@ -191,7 +201,12 @@ export class ImportSubtab {
 			const next = !currentEnabled;
 			currentEnabled = next;
 			toggleEl.setAttribute("aria-checked", String(next));
-			void this.deps.deviceStore.setEnabled(rule.id, next);
+			void (async () => {
+				await this.deps.deviceStore.setEnabled(rule.id, next);
+				// Scheduler reads enable state through DeviceStore — onRuleChanged
+				// causes it to (re-)evaluate and add or drop the timer.
+				await this.deps.scheduler.onRuleChanged(rule);
+			})();
 		});
 		row.appendChild(toggleEl);
 
@@ -256,7 +271,10 @@ export class ImportSubtab {
 					this.deps.importRuleEditor.renderForEdit(
 						editorContainer,
 						rule,
-						() => {
+						(updated) => {
+							if (updated !== undefined) {
+								void this.deps.scheduler.onRuleChanged(updated);
+							}
 							void this.loadAndRender(containerEl);
 						},
 					);
@@ -300,6 +318,7 @@ export class ImportSubtab {
 
 		await this.deps.ruleStore.remove(rule.id);
 		await this.deps.deviceStore.removeRule(rule.id);
+		this.deps.scheduler.onRuleRemoved(rule.id);
 		// Rerender with the updated rule list
 		void this.loadAndRender(containerEl);
 	}

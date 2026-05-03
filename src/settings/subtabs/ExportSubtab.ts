@@ -30,6 +30,11 @@ export interface ExportSubtabDeps {
 	};
 	scheduler: {
 		runOnce(id: RuleId, opts?: { dryRun?: boolean }): Promise<void>;
+		// onRuleChanged / onRuleRemoved keep the in-memory timer table in sync
+		// with rule mutations from the UI. Without these calls, freshly created
+		// or edited rules stay dormant until the plugin reloads.
+		onRuleChanged(rule: Rule): Promise<void>;
+		onRuleRemoved(id: RuleId): void;
 	};
 	exportRuleEditor: {
 		renderForCreate(c: HTMLElement, onDone: (r: Rule | undefined) => void): void;
@@ -113,8 +118,10 @@ export class ExportSubtab {
 		const addBtn = containerEl.ownerDocument.createElement("button");
 		addBtn.textContent = "+ add export rule";
 		addBtn.addEventListener("click", () => {
-			this.deps.exportRuleEditor.renderForCreate(containerEl, (_result) => {
-				// Re-render after creation
+			this.deps.exportRuleEditor.renderForCreate(containerEl, (created) => {
+				if (created !== undefined) {
+					void this.deps.scheduler.onRuleChanged(created);
+				}
 				void this._renderAsync(containerEl);
 			});
 		});
@@ -162,8 +169,13 @@ export class ExportSubtab {
 
 		toggle.addEventListener("click", () => {
 			const current = toggle.getAttribute("aria-checked") === "true";
-			void this.deps.deviceStore.setEnabled(rule.id, !current);
 			setToggle(!current);
+			void (async () => {
+				await this.deps.deviceStore.setEnabled(rule.id, !current);
+				// Scheduler reads enable state through DeviceStore — onRuleChanged
+				// causes it to (re-)evaluate and add or drop the timer.
+				await this.deps.scheduler.onRuleChanged(rule);
+			})();
 		});
 
 		row.appendChild(toggle);
@@ -211,7 +223,10 @@ export class ExportSubtab {
 						this.deps.exportRuleEditor.renderForEdit(
 							containerEl,
 							rule,
-							(_result) => {
+							(updated) => {
+								if (updated !== undefined) {
+									void this.deps.scheduler.onRuleChanged(updated);
+								}
 								void this._renderAsync(containerEl);
 							},
 						);
@@ -241,6 +256,7 @@ export class ExportSubtab {
 							if (!confirmed) return;
 							await this.deps.ruleStore.remove(rule.id);
 							await this.deps.deviceStore.removeRule(rule.id);
+							this.deps.scheduler.onRuleRemoved(rule.id);
 							void this._renderAsync(containerEl);
 						})();
 					},

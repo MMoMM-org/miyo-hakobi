@@ -120,6 +120,8 @@ function makeDeps(overrides: Partial<{
 		},
 		scheduler: {
 			runOnce: vi.fn(async () => {}),
+			onRuleChanged: vi.fn(async (_r: Rule) => {}),
+			onRuleRemoved: vi.fn((_id: RuleId) => {}),
 		},
 		exportRuleEditor: {
 			renderForCreate: vi.fn((_c: HTMLElement, _onDone: (r: Rule | undefined) => void) => {}),
@@ -486,5 +488,99 @@ describe("ExportSubtab", () => {
 		const toggleEl = containerEl.querySelector("[role='switch']");
 		expect(toggleEl).not.toBeNull();
 		expect(toggleEl!.getAttribute("aria-checked")).toBe("true");
+	});
+
+	// -------------------------------------------------------------------------
+	// Bug 3 — Subtab → Scheduler wiring (export side mirror of ImportSubtab)
+	// -------------------------------------------------------------------------
+
+	it("create flow: invokes scheduler.onRuleChanged with the freshly created rule", async () => {
+		const created = FOLDER_RULE;
+		const deps = makeDeps({ rules: [] });
+		// Override editor: synchronously call onDone with the created rule
+		deps.exportRuleEditor.renderForCreate = vi.fn(
+			(_c: HTMLElement, onDone: (r: Rule | undefined) => void) => onDone(created),
+		);
+
+		const subtab = new ExportSubtab(deps);
+		subtab.render(containerEl);
+		await flushMicrotasks();
+
+		const addBtn = findButtonByText(containerEl, "add export rule")!;
+		addBtn.click();
+		await flushMicrotasks();
+
+		expect(deps.scheduler.onRuleChanged).toHaveBeenCalledWith(created);
+	});
+
+	it("edit flow: invokes scheduler.onRuleChanged with the updated rule", async () => {
+		const updated: ExportRule = { ...FOLDER_RULE, name: "Renamed" };
+		const deps = makeDeps({ rules: [FOLDER_RULE] });
+		deps.exportRuleEditor.renderForEdit = vi.fn(
+			(_c: HTMLElement, _r: ExportRule, onDone: (r: Rule | undefined) => void) =>
+				onDone(updated),
+		);
+
+		const subtab = new ExportSubtab(deps);
+		subtab.render(containerEl);
+		await flushMicrotasks();
+
+		const overflowBtn = findButtonByText(containerEl, "⋯")!;
+		overflowBtn.click();
+		const items = getMenuItems(overflowBtn);
+		items.find((i) => i.label === "Edit")!.onClick();
+		await flushMicrotasks();
+
+		expect(deps.scheduler.onRuleChanged).toHaveBeenCalledWith(updated);
+	});
+
+	it("delete flow (confirmed): invokes scheduler.onRuleRemoved with the rule id", async () => {
+		const deps = makeDeps({ rules: [FOLDER_RULE], confirmResult: true });
+
+		const subtab = new ExportSubtab(deps);
+		subtab.render(containerEl);
+		await flushMicrotasks();
+
+		const overflowBtn = findButtonByText(containerEl, "⋯")!;
+		overflowBtn.click();
+		const items = getMenuItems(overflowBtn);
+		items.find((i) => i.label === "Delete")!.onClick();
+		await flushMicrotasks();
+		await flushMicrotasks();
+
+		expect(deps.scheduler.onRuleRemoved).toHaveBeenCalledWith(FOLDER_RULE.id);
+	});
+
+	it("delete flow (cancelled): does NOT invoke scheduler.onRuleRemoved", async () => {
+		const deps = makeDeps({ rules: [FOLDER_RULE], confirmResult: false });
+
+		const subtab = new ExportSubtab(deps);
+		subtab.render(containerEl);
+		await flushMicrotasks();
+
+		const overflowBtn = findButtonByText(containerEl, "⋯")!;
+		overflowBtn.click();
+		const items = getMenuItems(overflowBtn);
+		items.find((i) => i.label === "Delete")!.onClick();
+		await flushMicrotasks();
+		await flushMicrotasks();
+
+		expect(deps.scheduler.onRuleRemoved).not.toHaveBeenCalled();
+	});
+
+	it("toggle flow: invokes scheduler.onRuleChanged with the rule after setEnabled", async () => {
+		const deps = makeDeps({ rules: [FOLDER_RULE], isEnabled: false });
+
+		const subtab = new ExportSubtab(deps);
+		subtab.render(containerEl);
+		await flushMicrotasks();
+		await flushMicrotasks();
+
+		const toggleEl = containerEl.querySelector<HTMLElement>("[role='switch']")!;
+		toggleEl.click();
+		await flushMicrotasks();
+
+		expect(deps.deviceStore.setEnabled).toHaveBeenCalledWith(FOLDER_RULE.id, true);
+		expect(deps.scheduler.onRuleChanged).toHaveBeenCalledWith(FOLDER_RULE);
 	});
 });

@@ -34,6 +34,14 @@ _archive/
 # Live-test scratch — vault-backed E2E tests build tmp source/vault dirs here.
 test/tmp/
 
+# Runtime artefacts produced by the test vault during live manual testing —
+# audit logs, per-device state, plugin config, and the generic /tmp/ export
+# sink. These are session output, not source.
+/tmp/
+test/Hakobi/.obsidian/plugins/miyo-hakobi/audit/
+test/Hakobi/.obsidian/plugins/miyo-hakobi/device.json
+test/Hakobi/.obsidian/plugins/miyo-hakobi/data.json
+
 # MCP config (may contain API keys)
 .mcp.json
 

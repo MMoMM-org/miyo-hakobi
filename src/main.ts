@@ -10,13 +10,6 @@
 //   → InFlightRegistry → ImportRunner + ExportRunner → StatusBar
 //   → Scheduler → SettingsTab → CommandRegistry
 //
-// Known limitation (Phase 4 follow-up):
-//   The Scheduler's onRuleChanged / onRuleRemoved hooks are NOT wired into
-//   the subtabs' onSave callbacks in this phase. Rule changes (add/update/remove)
-//   are persisted via RuleStore directly from the subtabs, but the Scheduler does
-//   not learn about them until the user reloads the plugin or restarts Obsidian.
-//   A Phase 4 task will wire scheduler.onRuleChanged from subtab onSave closures.
-//
 // chooseFsFolder seam:
 //   The folder picker is wired to Electron's dialog.showOpenDialog via the
 //   renderer's runtime require(). We try `electron.remote.dialog` first
