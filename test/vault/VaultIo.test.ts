@@ -584,3 +584,55 @@ describe("VaultIo — resolveVaultPath", () => {
 		expect(result.startsWith("/")).toBe(true);
 	});
 });
+
+// ---------------------------------------------------------------------------
+// vaultRelativeOf — inverse of resolveVaultPath. Needed by main.ts's
+// openInDefaultApp seam, because Obsidian's app.openWithDefaultApp expects
+// a vault-relative path (and silently misroutes absolute paths into
+// `<vault>/<absolute>` lookups that never match anything).
+// ---------------------------------------------------------------------------
+
+describe("VaultIo — vaultRelativeOf", () => {
+	it("returns the relative segment when the path is inside the vault", () => {
+		const app = new App();
+		vi.mocked(app.vault.adapter.getBasePath).mockReturnValue("/Volumes/Vault");
+		const io = new VaultIo(app);
+
+		const rel = io.vaultRelativeOf("/Volumes/Vault/.obsidian/plugins/x/audit/2026-05.ndjson");
+
+		expect(rel).toBe(".obsidian/plugins/x/audit/2026-05.ndjson");
+	});
+
+	it("returns empty string for the vault root itself", () => {
+		const app = new App();
+		vi.mocked(app.vault.adapter.getBasePath).mockReturnValue("/Volumes/Vault");
+		const io = new VaultIo(app);
+
+		expect(io.vaultRelativeOf("/Volumes/Vault")).toBe("");
+	});
+
+	it("tolerates a vault root with a trailing slash", () => {
+		const app = new App();
+		vi.mocked(app.vault.adapter.getBasePath).mockReturnValue("/Volumes/Vault/");
+		const io = new VaultIo(app);
+
+		expect(io.vaultRelativeOf("/Volumes/Vault/Notes/x.md")).toBe("Notes/x.md");
+	});
+
+	it("returns null when the path is outside the vault", () => {
+		const app = new App();
+		vi.mocked(app.vault.adapter.getBasePath).mockReturnValue("/Volumes/Vault");
+		const io = new VaultIo(app);
+
+		expect(io.vaultRelativeOf("/tmp/elsewhere.md")).toBeNull();
+	});
+
+	it("returns null for a path that shares a prefix but is not nested (foo vs foobar)", () => {
+		const app = new App();
+		vi.mocked(app.vault.adapter.getBasePath).mockReturnValue("/Volumes/Vault");
+		const io = new VaultIo(app);
+
+		// "/Volumes/VaultExtra/x" must NOT be treated as inside "/Volumes/Vault"
+		expect(io.vaultRelativeOf("/Volumes/VaultExtra/x")).toBeNull();
+	});
+});

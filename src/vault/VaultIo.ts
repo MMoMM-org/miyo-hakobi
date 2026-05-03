@@ -239,6 +239,32 @@ export class VaultIo {
    * give ExportRunner a typed way to compute absolute child paths for
    * scope validation without reaching into Obsidian internals directly.
    */
+  /**
+   * Inverse of {@link resolveVaultPath}: given an absolute filesystem path,
+   * return the vault-relative segment if the path is inside the vault, or
+   * `null` if it is not.
+   *
+   * Used by main.ts's `openInDefaultApp` seam: Obsidian's
+   * `app.openWithDefaultApp(path)` expects a vault-relative path. Passing
+   * an absolute path silently fails because Obsidian re-roots it under the
+   * vault directory and finds nothing. Callers convert with this method,
+   * fall back to a Notice (or future Electron `shell.openPath`) if it
+   * returns `null`.
+   *
+   * Edge cases:
+   *  - Vault root itself returns "" (empty string), mirroring `resolveVaultPath("")`.
+   *  - A path that shares a prefix with the vault root but is NOT nested
+   *    (e.g. `/Volumes/VaultExtra` vs `/Volumes/Vault`) returns `null` —
+   *    we require an exact `/` boundary.
+   */
+  vaultRelativeOf(absPath: string): string | null {
+    const adapter = this.app.vault.adapter as unknown as { getBasePath(): string };
+    const v = adapter.getBasePath().replace(/\/+$/, "");
+    if (absPath === v) return "";
+    if (absPath.startsWith(`${v}/`)) return absPath.slice(v.length + 1);
+    return null;
+  }
+
   resolveVaultPath(vaultRelPath: string): string {
     const adapter = this.app.vault.adapter as unknown as { getBasePath(): string };
     const base = adapter.getBasePath();

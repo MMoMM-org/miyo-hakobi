@@ -296,13 +296,18 @@ export default class HakobiPlugin extends Plugin {
     const openInDefaultApp = async (absPath: string): Promise<void> => {
       // openWithDefaultApp is a prototype method on app that reads `this`, so
       // it must be invoked as a method — bare calls strip `this` and crash.
+      // It also expects a VAULT-RELATIVE path: passing an absolute one re-roots
+      // it under the vault dir and silently finds nothing (the audit-log
+      // "Show" button used to fail this way). Convert with vaultRelativeOf,
+      // and fall back to a Notice when the file isn't inside the vault.
       const augmentedApp = this.app as unknown as {
         openWithDefaultApp?: (p: string) => Promise<void>;
       };
-      if (typeof augmentedApp.openWithDefaultApp === "function") {
-        await augmentedApp.openWithDefaultApp(absPath);
+      const vaultRel = vaultIo.vaultRelativeOf(absPath);
+      if (vaultRel !== null && typeof augmentedApp.openWithDefaultApp === "function") {
+        await augmentedApp.openWithDefaultApp(vaultRel);
       } else {
-        // Fallback: surface the path in a Notice
+        // Fallback: surface the absolute path so the user can copy it
         Notices.transient(`Audit log path: ${absPath}`);
       }
     };
