@@ -63,6 +63,8 @@ export default class HakobiPlugin extends Plugin {
   };
 
   async onload(): Promise<void> {
+    console.info(`[Hakobi] plugin loading (${this.manifest.version})`);
+
     // ------------------------------------------------------------------
     // 1. NodeFs — timeout reads fresh from globalSettings on every call
     // ------------------------------------------------------------------
@@ -482,9 +484,12 @@ export default class HakobiPlugin extends Plugin {
       maxBytes: this.globalSettings.auditMaxBytes,
       retentionDays: this.globalSettings.auditRetentionDays,
     }).catch(() => undefined);
+
+    console.info("[Hakobi] plugin loaded");
   }
 
   onunload(): void {
+    console.info("[Hakobi] plugin unloading");
     this.scheduler?.stop();
   }
 }

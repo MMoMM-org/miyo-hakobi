@@ -103,12 +103,17 @@ export class Scheduler {
 	async start(): Promise<void> {
 		const { rules } = await this.ruleStore.load();
 
+		let enabledCount = 0;
 		for (const rule of rules) {
 			const enabled = await this.deviceStore.isEnabled(rule.id);
 			if (enabled) {
 				this.scheduleTimer(rule);
+				enabledCount += 1;
 			}
 		}
+		console.info(
+			`[Hakobi] config loaded: ${rules.length} rules (${enabledCount} enabled on this device)`,
+		);
 	}
 
 	// -------------------------------------------------------------------------
@@ -127,11 +132,18 @@ export class Scheduler {
 
 	async runInitialRun(): Promise<void> {
 		const { rules } = await this.ruleStore.load();
+		const enabledRules: Rule[] = [];
 		for (const rule of rules) {
 			const enabled = await this.deviceStore.isEnabled(rule.id);
-			if (!enabled) continue;
+			if (enabled) enabledRules.push(rule);
+		}
+		console.info(
+			`[Hakobi/Scheduler] initial run starting (${enabledRules.length} enabled rules)`,
+		);
+		for (const rule of enabledRules) {
 			await this.executeTick(rule, false);
 		}
+		console.info("[Hakobi/Scheduler] initial run finished");
 	}
 
 	// -------------------------------------------------------------------------
@@ -251,6 +263,9 @@ export class Scheduler {
 		const acquired = this.inFlight.tryAcquire(rule.id);
 
 		if (!acquired) {
+			console.info(
+				`[Hakobi/Scheduler] tick skip: ${rule.name} (${rule.direction}) — overlap`,
+			);
 			// Overlap — append audit entry and bail out
 			await this.auditLog.append({
 				timestamp: this.nowFn().toISOString(),
@@ -264,13 +279,23 @@ export class Scheduler {
 			return;
 		}
 
+		const tag = dryRun ? " [dry-run]" : "";
+		console.info(
+			`[Hakobi/Scheduler] tick begin: ${rule.name} (${rule.direction})${tag}`,
+		);
 		this.statusBar.setRunning(rule.name);
 
 		try {
 			await this.dispatchRunner(rule, dryRun);
 			this.statusBar.setIdle();
+			console.info(
+				`[Hakobi/Scheduler] tick end: ${rule.name} — ok`,
+			);
 		} catch (err: unknown) {
 			const summary = err instanceof Error ? err.message : "unknown error";
+			console.warn(
+				`[Hakobi/Scheduler] tick end: ${rule.name} — failed: ${summary}`,
+			);
 			this.statusBar.setFailed(summary);
 			// Append a rule-failed audit entry
 			await this.auditLog.append({
