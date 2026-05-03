@@ -44,7 +44,6 @@ import {
   TFile,
   TFolder,
   getAllTags,
-  normalizePath,
 } from "obsidian";
 
 // ---------------------------------------------------------------------------
@@ -243,9 +242,20 @@ export class VaultIo {
   resolveVaultPath(vaultRelPath: string): string {
     const adapter = this.app.vault.adapter as unknown as { getBasePath(): string };
     const base = adapter.getBasePath();
-    const trimmed = vaultRelPath.replace(/^\/+/, "").replace(/\/+$/, "");
+    // Normalize the vault-relative segment ONLY (backslashes → slashes, collapse
+    // duplicate slashes, strip leading/trailing slashes). We deliberately do
+    // NOT pass the joined absolute path through Obsidian's normalizePath:
+    // normalizePath assumes vault-relative input and strips the leading slash,
+    // turning "/Volumes/Vault/Foo" into "Volumes/Vault/Foo" — a corrupted
+    // absolute path that bypasses subsequent realpath/lstat scope checks and
+    // causes ScopeViolations downstream.
+    const trimmed = vaultRelPath
+      .replace(/\\/g, "/")
+      .replace(/\/+/g, "/")
+      .replace(/^\/+/, "")
+      .replace(/\/+$/, "");
     if (trimmed === "") return base;
-    return normalizePath(`${base}/${trimmed}`);
+    return `${base}/${trimmed}`;
   }
 
   /**

@@ -565,4 +565,22 @@ describe("VaultIo — resolveVaultPath", () => {
 
 		expect(result).toBe("/vault/Notes/note.md");
 	});
+
+	// Regression: VaultIo.resolveVaultPath used to call Obsidian's normalizePath
+	// on the joined absolute path, which strips the leading slash and produced a
+	// corrupt path like "Volumes/Moon/.../200 Outbox". That broke downstream
+	// realpath/lstat scope checks for ExportRunner (folder + note rules surfaced
+	// as forbidden-path / escape ScopeViolations).
+	it("preserves leading slash on a real-shaped absolute base path", () => {
+		const app = new App();
+		vi.mocked(app.vault.adapter.getBasePath).mockReturnValue(
+			"/Volumes/Vault/test",
+		);
+		const io = new VaultIo(app);
+
+		const result = io.resolveVaultPath("200 Outbox");
+
+		expect(result).toBe("/Volumes/Vault/test/200 Outbox");
+		expect(result.startsWith("/")).toBe(true);
+	});
 });

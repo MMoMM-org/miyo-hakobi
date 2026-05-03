@@ -526,8 +526,21 @@ export class Events {
 
 // --- Utilities ---
 
+// Mirrors Obsidian's runtime normalizePath:
+//   - backslashes → forward slashes
+//   - collapses "//+" to "/"
+//   - strips leading and trailing slashes (except for the root "/")
+//   - NFC-normalizes
+// The leading-slash strip is the part most commonly forgotten — Obsidian's
+// normalizePath assumes vault-relative input and turns "/Foo" into "Foo".
+// Code that joins an absolute base path before calling normalizePath will
+// silently lose the leading slash. Tests must reproduce this to catch it.
 export function normalizePath(path: string): string {
-	return path.replace(/\\/g, "/").replace(/\/+/g, "/");
+	let p = path.replace(/\\/g, "/").replace(/\/+/g, "/").normalize("NFC");
+	if (p === "/") return "/";
+	if (p.startsWith("/")) p = p.slice(1);
+	if (p.endsWith("/")) p = p.slice(0, -1);
+	return p;
 }
 
 export const getAllTags = vi.fn(
