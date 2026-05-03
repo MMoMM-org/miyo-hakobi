@@ -42,6 +42,13 @@ test/Hakobi/.obsidian/plugins/miyo-hakobi/audit/
 test/Hakobi/.obsidian/plugins/miyo-hakobi/device.json
 test/Hakobi/.obsidian/plugins/miyo-hakobi/data.json
 
+# Inbox in the test vault is the destination of the Recorder import rule —
+# anything that lands there is transient session data (voice memos, txt
+# imports), not source. History was rewritten on 2026-05-03 to remove the
+# previously-tracked files; the backup-pre-100inbox-rewrite tag holds them
+# if needed.
+test/Hakobi/100 Inbox/
+
 # MCP config (may contain API keys)
 .mcp.json
 
