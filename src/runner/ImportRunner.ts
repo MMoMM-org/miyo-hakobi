@@ -35,6 +35,7 @@ import {
 import type { VaultIo } from "../vault/VaultIo";
 import { resolveCollisionName, writeVaultAtomic } from "./AtomicWriter";
 import { mapScopeViolationToErrorCode } from "./errorCodeMapping";
+import { type RunStats, EMPTY_STATS, tally } from "./RunStats";
 import type { AuditLog } from "../audit/AuditLog";
 import type { AuditEntry, ErrorCode } from "../audit/AuditEntry";
 
@@ -99,7 +100,7 @@ export class ImportRunner {
    * @param rule The import rule to execute.
    * @param opts Optional per-invocation overrides. opts.dryRun wins over rule.dryRun.
    */
-  async run(rule: ImportRule, opts?: { dryRun?: boolean }): Promise<void> {
+  async run(rule: ImportRule, opts?: { dryRun?: boolean }): Promise<RunStats> {
     const auditLog = this.deps.auditLog;
     const nodeFs = this.deps.nodeFs;
     const vaultIo = this.deps.vaultIo;
@@ -139,7 +140,7 @@ export class ImportRunner {
         decision: "rule-failed",
         errorCode: mapScopeViolationToErrorCode(scopeResult.errors.reason),
       });
-      return;
+      return { ...EMPTY_STATS };
     }
 
     // -----------------------------------------------------------------------
@@ -157,7 +158,7 @@ export class ImportRunner {
           decision: "rule-failed",
           errorCode: "source-not-found",
         });
-        return;
+        return { ...EMPTY_STATS };
       }
       throw err;
     }
@@ -374,7 +375,7 @@ export class ImportRunner {
             sourcePathRelative: relPath,
             errorCode: "disk-full",
           });
-          return;
+          return outcomesToStats(outcomes);
         }
         await auditLog.append({
           ...base(),
@@ -460,7 +461,7 @@ export class ImportRunner {
             destinationPathRelative: finalDestSubpath,
             errorCode: "disk-full",
           });
-          return;
+          return outcomesToStats(outcomes);
         }
         await auditLog.append({
           ...base(),
@@ -533,7 +534,17 @@ export class ImportRunner {
         decision: ruleDecision,
       });
     }
+
+    return outcomesToStats(outcomes);
   }
+}
+
+/** Tally per-file outcomes into a RunStats object. FileOutcome is a strict
+ *  subset of Decision so the shared `tally` helper applies directly. */
+function outcomesToStats(outcomes: FileOutcome[]): RunStats {
+  const stats: RunStats = { copied: 0, skipped: 0, failed: 0 };
+  for (const o of outcomes) tally(stats, o);
+  return stats;
 }
 
 // ---------------------------------------------------------------------------

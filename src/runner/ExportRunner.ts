@@ -43,6 +43,7 @@ import {
   writeFsBinaryAtomic,
 } from "./AtomicWriter";
 import { mapScopeViolationToErrorCode } from "./errorCodeMapping";
+import { type RunStats, tally } from "./RunStats";
 
 // ---------------------------------------------------------------------------
 // Deps shape (constructor DI)
@@ -91,9 +92,10 @@ export class ExportRunner {
    * source, missing parent dir) are surfaced via audit entries and resolve
    * normally.
    */
-  async run(rule: ExportRule, opts?: { dryRun?: boolean }): Promise<void> {
+  async run(rule: ExportRule, opts?: { dryRun?: boolean }): Promise<RunStats> {
     const dryRun = opts?.dryRun ?? rule.dryRun;
     const ts = this.nowFn().toISOString();
+    const stats: RunStats = { copied: 0, skipped: 0, failed: 0 };
 
     // Step 0 (note rules only): existence pre-check.
     //
@@ -114,7 +116,7 @@ export class ExportRunner {
       const file = this.vaultIo.fileByPath(rule.sourceVaultNotePath);
       if (file === null) {
         await this.appendRuleFailed(rule, ts, "source-not-found");
-        return;
+        return stats;
       }
     }
 
@@ -126,7 +128,7 @@ export class ExportRunner {
         ts,
         mapScopeViolationToErrorCode(scopeResult.errors.reason),
       );
-      return;
+      return stats;
     }
 
     // Step 2: verify the parent of destinationPath exists on the FS.
@@ -135,7 +137,7 @@ export class ExportRunner {
     const parentMissing = await this.checkDestinationParent(rule.destinationPath);
     if (parentMissing) {
       await this.appendRuleFailed(rule, ts, "destination-parent-missing");
-      return;
+      return stats;
     }
 
     // Step 3: ensure the destinationPath directory itself exists (create if needed).
@@ -144,14 +146,14 @@ export class ExportRunner {
       await this.nodeFs.mkdir(rule.destinationPath);
     } catch {
       await this.appendRuleFailed(rule, ts, "destination-parent-missing");
-      return;
+      return stats;
     }
 
     // Step 4: enumerate source files based on sourceType.
     const files = await this.enumerateSource(rule, ts);
     if (files === null) {
       // enumerateSource already wrote the rule-failed entry.
-      return;
+      return stats;
     }
 
     // Step 5: process each file.
@@ -159,6 +161,7 @@ export class ExportRunner {
     for (const file of files) {
       const decision = await this.processFile(rule, file, dryRun, ts);
       decisions.push(decision);
+      tally(stats, decision);
     }
 
     // Step 6: write rule-level summary.
@@ -166,6 +169,8 @@ export class ExportRunner {
     await this.auditLog.append(
       this.buildRuleEntry(rule, ts, ruleLevelDecision),
     );
+
+    return stats;
   }
 
   // -------------------------------------------------------------------------

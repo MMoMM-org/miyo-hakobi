@@ -14,6 +14,7 @@
 import type { Rule, RuleId, ImportRule, ExportRule } from "../types/index";
 import type { AuditEntry } from "../audit/AuditEntry";
 import type { Direction } from "../audit/AuditEntry";
+import type { RunStats } from "../runner/RunStats";
 import { InFlightRegistry } from "./InFlightRegistry";
 
 // ---------------------------------------------------------------------------
@@ -37,11 +38,11 @@ export interface SchedulerDeviceStore {
 }
 
 export interface SchedulerImportRunner {
-	run(rule: ImportRule, opts?: { dryRun?: boolean }): Promise<void>;
+	run(rule: ImportRule, opts?: { dryRun?: boolean }): Promise<RunStats>;
 }
 
 export interface SchedulerExportRunner {
-	run(rule: ExportRule, opts?: { dryRun?: boolean }): Promise<void>;
+	run(rule: ExportRule, opts?: { dryRun?: boolean }): Promise<RunStats>;
 }
 
 export interface SchedulerStatusBar {
@@ -286,10 +287,10 @@ export class Scheduler {
 		this.statusBar.setRunning(rule.name);
 
 		try {
-			await this.dispatchRunner(rule, dryRun);
+			const stats = await this.dispatchRunner(rule, dryRun);
 			this.statusBar.setIdle();
 			console.info(
-				`[Hakobi/Scheduler] tick end: ${rule.name} — ok`,
+				`[Hakobi/Scheduler] tick end: ${rule.name} — ok (${stats.copied} copied, ${stats.skipped} skipped, ${stats.failed} failed)`,
 			);
 		} catch (err: unknown) {
 			const summary = err instanceof Error ? err.message : "unknown error";
@@ -313,11 +314,10 @@ export class Scheduler {
 	}
 
 	/** Dispatch to the correct runner based on the rule's direction. */
-	private async dispatchRunner(rule: Rule, dryRun: boolean): Promise<void> {
+	private async dispatchRunner(rule: Rule, dryRun: boolean): Promise<RunStats> {
 		if (rule.direction === "import") {
-			await this.importRunner.run(rule, { dryRun });
-		} else {
-			await this.exportRunner.run(rule, { dryRun });
+			return this.importRunner.run(rule, { dryRun });
 		}
+		return this.exportRunner.run(rule, { dryRun });
 	}
 }

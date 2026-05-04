@@ -726,3 +726,82 @@ describe("ExportRunner — rule-level summary", () => {
     expect(perFileDecisions).toContain("error");
   });
 });
+
+// ---------------------------------------------------------------------------
+// RunStats — runner returns a typed summary so the Scheduler can log
+// "tick end: <name> — ok (N copied, M skipped)" without parsing the audit log.
+// ---------------------------------------------------------------------------
+
+describe("ExportRunner — RunStats return value", () => {
+  it("returns copied=N when every file was written", async () => {
+    const files = [
+      createMockTFile({ path: "Notes/a.md", name: "a.md" }),
+      createMockTFile({ path: "Notes/b.md", name: "b.md" }),
+      createMockTFile({ path: "Notes/c.md", name: "c.md" }),
+    ];
+    const vault = makeVaultStub({
+      listFolder: async () => files,
+      readBinary: async () => new ArrayBuffer(4),
+    });
+    const fs = makeFsStub();
+    const { runner } = makeRunner({ vault, fs });
+
+    const stats = await runner.run(makeFolderRule({ onCollision: "skip" }));
+
+    expect(stats).toEqual({ copied: 3, skipped: 0, failed: 0 });
+  });
+
+  it("returns skipped=N when collisions cause skip-on-collision skips", async () => {
+    const files = [
+      createMockTFile({ path: "Notes/a.md", name: "a.md" }),
+      createMockTFile({ path: "Notes/b.md", name: "b.md" }),
+    ];
+    const vault = makeVaultStub({
+      listFolder: async () => files,
+      readBinary: async () => new ArrayBuffer(4),
+    });
+    // lstat returns "is file" for any destination path → collision
+    const fs = makeFsStub({
+      lstat: async () => ({
+        isFile: () => true,
+        isDirectory: () => false,
+        isSymbolicLink: () => false,
+      }),
+    });
+    const { runner } = makeRunner({ vault, fs });
+
+    const stats = await runner.run(makeFolderRule({ onCollision: "skip" }));
+
+    expect(stats.skipped).toBe(2);
+    expect(stats.copied).toBe(0);
+    expect(stats.failed).toBe(0);
+  });
+
+  it("returns copied counts in dry-run (would-write classified as copied)", async () => {
+    const file = createMockTFile({ path: "Notes/a.md", name: "a.md" });
+    const vault = makeVaultStub({
+      listFolder: async () => [file],
+      readBinary: async () => new ArrayBuffer(4),
+    });
+    const fs = makeFsStub();
+    const { runner } = makeRunner({ vault, fs });
+
+    const stats = await runner.run(makeFolderRule(), { dryRun: true });
+
+    expect(stats.copied).toBe(1);
+  });
+
+  it("returns zeroed stats when scope validation fails (no per-file work)", async () => {
+    const violation: ScopeViolation = {
+      reason: "vault-loop",
+      path: DEST_DIR,
+      detail: "destination inside vault",
+    };
+    const scopeValidator = makeScopeValidator({ ok: false, errors: violation });
+    const { runner } = makeRunner({ scopeValidator });
+
+    const stats = await runner.run(makeFolderRule());
+
+    expect(stats).toEqual({ copied: 0, skipped: 0, failed: 0 });
+  });
+});

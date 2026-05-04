@@ -78,11 +78,11 @@ function makeDeviceStore(enabledIds: Set<RuleId> = new Set()) {
 }
 
 function makeImportRunner() {
-	return { run: vi.fn(async () => {}) };
+	return { run: vi.fn(async () => ({ copied: 0, skipped: 0, failed: 0 })) };
 }
 
 function makeExportRunner() {
-	return { run: vi.fn(async () => {}) };
+	return { run: vi.fn(async () => ({ copied: 0, skipped: 0, failed: 0 })) };
 }
 
 function makeStatusBar() {
@@ -468,7 +468,9 @@ describe("Scheduler", () => {
 			const auditLog = makeAuditLog();
 
 			// importRunner that never resolves (simulates long-running execution)
-			const neverResolving = vi.fn(() => new Promise<void>(() => {}));
+			const neverResolving = vi.fn(
+				() => new Promise<{ copied: number; skipped: number; failed: number }>(() => {}),
+			);
 			const importRunner = { run: neverResolving };
 
 			const inFlight = new InFlightRegistry();
