@@ -45,6 +45,7 @@ import { HakobiSettingsTab } from "./settings/SettingsTab";
 import { ImportRuleEditor } from "./settings/editor/ImportRuleEditor";
 import { ExportRuleEditor } from "./settings/editor/ExportRuleEditor";
 import { validateRuleAtRunTime } from "./domain/scope";
+import { log } from "./util/logger";
 
 import type { GlobalSettings } from "./types/index";
 import type { ImportRule } from "./domain/rule";
@@ -63,7 +64,7 @@ export default class HakobiPlugin extends Plugin {
   };
 
   async onload(): Promise<void> {
-    console.info(`[Hakobi] plugin loading (${this.manifest.version})`);
+    log.debug(`[Hakobi] plugin loading (${this.manifest.version})`);
 
     // ------------------------------------------------------------------
     // 1. NodeFs — timeout reads fresh from globalSettings on every call
@@ -468,7 +469,7 @@ export default class HakobiPlugin extends Plugin {
     this.app.workspace.onLayoutReady(() => {
       const timeoutId = window.setTimeout(() => {
         this.scheduler.runInitialRun().catch((err: unknown) => {
-          console.error("[Hakobi] initial run failed:", err);
+          log.error("[Hakobi] initial run failed:", err);
         });
       }, INITIAL_RUN_GRACE_MS);
       // Clear the timeout if the plugin unloads before the grace period
@@ -485,11 +486,11 @@ export default class HakobiPlugin extends Plugin {
       retentionDays: this.globalSettings.auditRetentionDays,
     }).catch(() => undefined);
 
-    console.info("[Hakobi] plugin loaded");
+    log.debug("[Hakobi] plugin loaded");
   }
 
   onunload(): void {
-    console.info("[Hakobi] plugin unloading");
+    log.debug("[Hakobi] plugin unloading");
     this.scheduler?.stop();
   }
 }

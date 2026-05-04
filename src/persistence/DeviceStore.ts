@@ -20,6 +20,7 @@
 
 import type { RuleId } from "../domain/ruleId";
 import type { DeviceState } from "../types";
+import { log } from "../util/logger";
 
 // ---------------------------------------------------------------------------
 // Public interfaces
@@ -74,7 +75,7 @@ export class DeviceStore {
       raw = await this.adapter.read(this.deviceJsonPath);
     } catch {
       // read failed unexpectedly after exists returned true — treat as corrupt
-      console.warn(
+      log.warn(
         "[DeviceStore] Failed to read device.json; re-initializing with a fresh device.",
       );
       await this.initFresh();
@@ -85,7 +86,7 @@ export class DeviceStore {
     try {
       parsed = JSON.parse(raw);
     } catch {
-      console.warn(
+      log.warn(
         "[DeviceStore] device.json contains malformed JSON; re-initializing with a fresh device.",
       );
       await this.initFresh();
@@ -110,7 +111,7 @@ export class DeviceStore {
         ruleEnablement: p.ruleEnablement as Record<RuleId, boolean>,
       };
     } else {
-      console.warn(
+      log.warn(
         "[DeviceStore] device.json has unexpected structure; re-initializing with a fresh device.",
       );
       await this.initFresh();

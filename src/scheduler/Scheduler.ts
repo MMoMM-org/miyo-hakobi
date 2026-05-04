@@ -16,6 +16,7 @@ import type { AuditEntry } from "../audit/AuditEntry";
 import type { Direction } from "../audit/AuditEntry";
 import type { RunStats } from "../runner/RunStats";
 import { InFlightRegistry } from "./InFlightRegistry";
+import { log } from "../util/logger";
 
 // ---------------------------------------------------------------------------
 // Structural interfaces — smallest slice the Scheduler actually needs
@@ -112,7 +113,7 @@ export class Scheduler {
 				enabledCount += 1;
 			}
 		}
-		console.info(
+		log.debug(
 			`[Hakobi] config loaded: ${rules.length} rules (${enabledCount} enabled on this device)`,
 		);
 	}
@@ -138,13 +139,13 @@ export class Scheduler {
 			const enabled = await this.deviceStore.isEnabled(rule.id);
 			if (enabled) enabledRules.push(rule);
 		}
-		console.info(
+		log.debug(
 			`[Hakobi/Scheduler] initial run starting (${enabledRules.length} enabled rules)`,
 		);
 		for (const rule of enabledRules) {
 			await this.executeTick(rule, false);
 		}
-		console.info("[Hakobi/Scheduler] initial run finished");
+		log.debug("[Hakobi/Scheduler] initial run finished");
 	}
 
 	// -------------------------------------------------------------------------
@@ -238,7 +239,7 @@ export class Scheduler {
 			// Fire-and-forget the async tick; catch any uncaught rejection to
 			// prevent an unhandled rejection from killing the timer chain.
 			this.executeTick(rule, false).catch((err: unknown) => {
-				console.error("[Scheduler] Uncaught error in timer tick:", err);
+				log.error("[Scheduler] Uncaught error in timer tick:", err);
 			});
 		}, intervalMs);
 
@@ -264,7 +265,7 @@ export class Scheduler {
 		const acquired = this.inFlight.tryAcquire(rule.id);
 
 		if (!acquired) {
-			console.info(
+			log.debug(
 				`[Hakobi/Scheduler] tick skip: ${rule.name} (${rule.direction}) — overlap`,
 			);
 			// Overlap — append audit entry and bail out
@@ -281,7 +282,7 @@ export class Scheduler {
 		}
 
 		const tag = dryRun ? " [dry-run]" : "";
-		console.info(
+		log.debug(
 			`[Hakobi/Scheduler] tick begin: ${rule.name} (${rule.direction})${tag}`,
 		);
 		this.statusBar.setRunning(rule.name);
@@ -289,12 +290,12 @@ export class Scheduler {
 		try {
 			const stats = await this.dispatchRunner(rule, dryRun);
 			this.statusBar.setIdle();
-			console.info(
+			log.debug(
 				`[Hakobi/Scheduler] tick end: ${rule.name} — ok (${stats.copied} copied, ${stats.skipped} skipped, ${stats.failed} failed)`,
 			);
 		} catch (err: unknown) {
 			const summary = err instanceof Error ? err.message : "unknown error";
-			console.warn(
+			log.warn(
 				`[Hakobi/Scheduler] tick end: ${rule.name} — failed: ${summary}`,
 			);
 			this.statusBar.setFailed(summary);
