@@ -1,6 +1,16 @@
-# MiYo Hakobi
+<p align="center">
+  <img src="assets/hakobi_banner.svg" alt="MiYo Hakobi banner" width="480" />
+</p>
+
+# MiYo Hakobi -- Obsidian File Ferry
 
 > Scheduled file ferry between local filesystem and your Obsidian vault — without inviting any cloud-API, daemon, telemetry, or inbound-network trade-offs.
+
+> Part of the **MiYo** family. The plugin is referred to as **MiYo Hakobi** in the Obsidian community-plugin index and in the settings UI; "Hakobi" alone is used as a short form throughout this README and the source.
+
+<p align="center">
+  <img src="assets/hakobi_hanko.png" alt="MiYo Hakobi hanko" width="160" />
+</p>
 
 ## Table of Contents
 
