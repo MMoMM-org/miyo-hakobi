@@ -31,7 +31,14 @@ type SettingsSubtab = "general" | "import" | "export";
 
 export interface StatusBarDeps {
 	/** Structural slice — only the subset of Plugin that StatusBar needs. */
-	plugin: { addStatusBarItem: () => HTMLElement };
+	plugin: {
+		addStatusBarItem: () => HTMLElement;
+		registerDomEvent(
+			el: HTMLElement,
+			type: string,
+			callback: (ev: Event) => void,
+		): void;
+	};
 	/** Open the plugin settings modal at a specific subtab. */
 	openSettings: (subtab: SettingsSubtab) => void;
 }
@@ -59,11 +66,9 @@ export class StatusBar {
 			text: "運",
 		});
 
-		// Register click handler directly on the element.
-		// The element's lifecycle is owned by Obsidian (via addStatusBarItem),
-		// so there is no separate cleanup needed here — Obsidian removes the
-		// status-bar item on plugin unload.
-		this.el.addEventListener("click", () => {
+		// Register click handler via plugin.registerDomEvent so Obsidian
+		// auto-removes the listener on plugin unload.
+		deps.plugin.registerDomEvent(this.el, "click", () => {
 			if (this.state === "failed") {
 				// User acknowledges the failure; clear it and open settings.
 				this.applyState("idle");

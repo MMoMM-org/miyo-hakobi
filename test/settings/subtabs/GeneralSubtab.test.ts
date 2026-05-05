@@ -116,22 +116,23 @@ describe("GeneralSubtab", () => {
 		// Verify loadGlobalSettings was called
 		expect(deps.ruleStore.loadGlobalSettings).toHaveBeenCalledOnce();
 
-		// Verify four inputs with the seeded values are present
+		// Inputs surface display units (seconds / MB / days), not canonical units.
+		// Storage stays in ms / bytes / days; the conversion happens at the UI edge.
 		const timeoutInput = findInputByLabel(containerEl, "timeout");
 		expect(timeoutInput).not.toBeNull();
-		expect(timeoutInput?.value).toBe("10000");
+		expect(timeoutInput?.value).toBe("10"); // 10000 ms → 10 s
 
 		const retentionInput = findInputByLabel(containerEl, "retention");
 		expect(retentionInput).not.toBeNull();
-		expect(retentionInput?.value).toBe("90");
+		expect(retentionInput?.value).toBe("90"); // days, no conversion
 
-		const maxBytesInput = findInputByLabel(containerEl, "max bytes");
-		expect(maxBytesInput).not.toBeNull();
-		expect(maxBytesInput?.value).toBe("10485760");
+		const maxLogInput = findInputByLabel(containerEl, "log size");
+		expect(maxLogInput).not.toBeNull();
+		expect(maxLogInput?.value).toBe("10"); // 10485760 bytes → 10 MB
 
 		const stabilityInput = findInputByLabel(containerEl, "stability");
 		expect(stabilityInput).not.toBeNull();
-		expect(stabilityInput?.value).toBe("2000");
+		expect(stabilityInput?.value).toBe("2"); // 2000 ms → 2 s
 	});
 
 	// -------------------------------------------------------------------------
@@ -147,7 +148,8 @@ describe("GeneralSubtab", () => {
 
 		const input = findInputByLabel(containerEl, "timeout");
 		expect(input).not.toBeNull();
-		input!.value = "15000";
+		// Display unit is seconds; the helper multiplies by 1000 before saving.
+		input!.value = "15";
 		input!.dispatchEvent(new Event("input"));
 		await flushMicrotasks();
 
@@ -194,15 +196,16 @@ describe("GeneralSubtab", () => {
 		subtab.render(containerEl);
 		await flushMicrotasks();
 
-		const input = findInputByLabel(containerEl, "max bytes");
+		const input = findInputByLabel(containerEl, "log size");
 		expect(input).not.toBeNull();
-		input!.value = "5242880";
+		// Display unit is MB; the helper multiplies by 1024*1024 before saving.
+		input!.value = "5";
 		input!.dispatchEvent(new Event("input"));
 		await flushMicrotasks();
 
 		expect(saveGlobalSettings).toHaveBeenCalledOnce();
 		const arg = saveGlobalSettings.mock.calls[0]![0] as GlobalSettings;
-		expect(arg.auditMaxBytes).toBe(5242880);
+		expect(arg.auditMaxBytes).toBe(5 * 1024 * 1024);
 		expect(arg.perFileTimeoutMs).toBe(SEED_SETTINGS.perFileTimeoutMs);
 	});
 
@@ -219,7 +222,8 @@ describe("GeneralSubtab", () => {
 
 		const input = findInputByLabel(containerEl, "stability");
 		expect(input).not.toBeNull();
-		input!.value = "5000";
+		// Display unit is seconds; the helper multiplies by 1000 before saving.
+		input!.value = "5";
 		input!.dispatchEvent(new Event("input"));
 		await flushMicrotasks();
 
@@ -357,11 +361,14 @@ describe("GeneralSubtab", () => {
 	// -------------------------------------------------------------------------
 
 	it.each([
-		{ label: "max bytes", invalid: "abc",  field: "auditMaxBytes",     seed: SEED_SETTINGS.auditMaxBytes },
-		{ label: "max bytes", invalid: "1e5",  field: "auditMaxBytes",     seed: SEED_SETTINGS.auditMaxBytes },
-		{ label: "max bytes", invalid: "-5",   field: "auditMaxBytes",     seed: SEED_SETTINGS.auditMaxBytes },
-		{ label: "timeout",   invalid: "1e5",  field: "perFileTimeoutMs",  seed: SEED_SETTINGS.perFileTimeoutMs },
-	])("invalid input '$invalid' in '$label' does not save and resets input to seed value", async ({ label, invalid, seed }) => {
+		// `displayValue` is what the input shows after reset — the canonical
+		// stored value divided by the field's display divisor (1000 for ms→s,
+		// 1024*1024 for bytes→MB).
+		{ label: "log size", invalid: "abc",  displayValue: "10" },
+		{ label: "log size", invalid: "1e5",  displayValue: "10" },
+		{ label: "log size", invalid: "-5",   displayValue: "10" },
+		{ label: "timeout",  invalid: "1e5",  displayValue: "10" },
+	])("invalid input '$invalid' in '$label' does not save and resets input to '$displayValue'", async ({ label, invalid, displayValue }) => {
 		const saveGlobalSettings = vi.fn(async () => {});
 		const deps = makeDeps({ saveGlobalSettings });
 		const subtab = new GeneralSubtab(deps);
@@ -377,7 +384,7 @@ describe("GeneralSubtab", () => {
 
 		// saveGlobalSettings must NOT have been called with the invalid value
 		expect(saveGlobalSettings).not.toHaveBeenCalled();
-		// The input must be reset to the previously loaded value
-		expect(input!.value).toBe(String(seed));
+		// The input must be reset to the previously loaded display value
+		expect(input!.value).toBe(displayValue);
 	});
 });

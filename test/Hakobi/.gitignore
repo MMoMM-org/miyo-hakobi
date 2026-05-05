@@ -14,6 +14,7 @@
 .obsidian/plugins/*/main.js
 .obsidian/plugins/*/manifest.json
 .obsidian/plugins/*/styles.css
+.obsidian/plugins/*/assets/
 
 # Keep hot-reload (committed tooling)
 !.obsidian/plugins/hot-reload/main.js

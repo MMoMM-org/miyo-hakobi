@@ -78,10 +78,15 @@ function emptyEl(el: HTMLElement): void {
 
 export class HakobiSettingsTab extends PluginSettingTab {
 	private readonly deps: SettingsTabDeps;
+	// Obsidian's PluginSettingTab stores the Plugin at runtime but does NOT
+	// expose it on the public type. Keep our own typed reference so we can
+	// call plugin.registerDomEvent for tab-button click registration.
+	private readonly hostPlugin: Plugin;
 
 	constructor(app: App, plugin: Plugin, deps: SettingsTabDeps) {
 		super(app, plugin);
 		this.deps = deps;
+		this.hostPlugin = plugin;
 	}
 
 	/**
@@ -104,8 +109,12 @@ export class HakobiSettingsTab extends PluginSettingTab {
 		const headerContainer = createDiv(containerEl, { cls: "hakobi-settings-header" });
 		this.deps.headerSection.render(headerContainer);
 
-		// 2. Subtab row
-		const subtabRow = createDiv(containerEl, { cls: "hakobi-settings-subtab-row" });
+		// 2. Subtab row — Kado-style tab-bar with bottom-border accent on active.
+		// Active button carries BOTH `mod-cta` (kept for back-compat with existing
+		// tests / Obsidian visual conventions) and `is-active` (the CSS hook used
+		// by .hakobi-tab.is-active for the underline accent).
+		const subtabRow = createDiv(containerEl, { cls: "hakobi-tab-bar" });
+		const tabStrip = createDiv(subtabRow, { cls: "hakobi-tab-strip" });
 		const buttons = new Map<SubtabKey, HTMLButtonElement>();
 		let activeKey: SubtabKey = initialSubtab;
 
@@ -116,30 +125,29 @@ export class HakobiSettingsTab extends PluginSettingTab {
 		const onSwap = (newKey: SubtabKey): void => {
 			if (newKey === activeKey) return;
 
-			// Move mod-cta
 			const prev = buttons.get(activeKey);
 			const next = buttons.get(newKey);
-			prev?.classList.remove("mod-cta");
-			next?.classList.add("mod-cta");
+			prev?.classList.remove("mod-cta", "is-active");
+			next?.classList.add("mod-cta", "is-active");
 
 			activeKey = newKey;
 
-			// Swap body
 			emptyEl(bodyContainer);
 			this._renderActiveSubtab(activeKey, bodyContainer);
 		};
 
-		const rowEl = subtabRow as unknown as {
+		const stripEl = tabStrip as unknown as {
 			createEl(tag: string, opts?: { cls?: string; text?: string }): HTMLElement;
 		};
 
 		for (const meta of SUBTABS) {
-			const cls = meta.key === initialSubtab ? "mod-cta" : "";
-			const btn = rowEl.createEl("button", {
+			const isActive = meta.key === initialSubtab;
+			const cls = isActive ? "hakobi-tab mod-cta is-active" : "hakobi-tab";
+			const btn = stripEl.createEl("button", {
 				text: meta.label,
-				...(cls ? { cls } : {}),
+				cls,
 			}) as HTMLButtonElement;
-			btn.addEventListener("click", () => onSwap(meta.key));
+			this.hostPlugin.registerDomEvent(btn, "click", () => onSwap(meta.key));
 			buttons.set(meta.key, btn);
 		}
 

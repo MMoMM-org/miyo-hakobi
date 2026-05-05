@@ -1,31 +1,58 @@
 /**
  * HeaderSection — persistent header rendered above the subtab row in the SettingsTab.
  *
- * Why this file exists: the header surfaces plugin identity (name, tagline, author,
- * GitHub repo, funding) sourced directly from manifest.json so that any change to
- * plugin metadata automatically propagates to the UI without code edits. This is the
- * manifest-driven approach mandated by ADR-10.
+ * Why this file exists: the header surfaces plugin identity (name, version, author,
+ * documentation link) sourced directly from manifest.json plus the Hakobi hanko
+ * (印, the seal) as a visual anchor on the right. Manifest-driven so any change
+ * to plugin metadata automatically propagates.
+ *
+ * Layout (two-column flex):
+ *   ┌─ .hakobi-header-text (flex 1) ──────────────────┐  ┌─ .hakobi-header-hanko ─┐
+ *   │ .hakobi-header-identity                          │  │   <img 72x72>          │
+ *   │   Name v0.1.0 · Author · Documentation           │  │                        │
+ *   │ .hakobi-tagline                                  │  │                        │
+ *   │   <short tagline, first half of manifest desc>   │  │                        │
+ *   └──────────────────────────────────────────────────┘  └────────────────────────┘
+ *
+ * Tagline: hardcoded `TAGLINE` constant. We deliberately keep this independent
+ * from `manifest.description` — the manifest description is the prose blurb
+ * Obsidian shows in its Community Plugins listing (longer, search-friendly),
+ * while the in-plugin header tagline is a punchy four-word identity. They serve
+ * different audiences.
+ *
+ * Funding links: NOT rendered here. Obsidian's Community Plugins UI surfaces
+ * `manifest.fundingUrl` automatically on the plugin's listing page, so we don't
+ * duplicate it inside our own settings panel.
  *
  * All link elements are constructed via Obsidian's createEl() helper rather than
- * innerHTML — required by Obsidian plugin guidelines and the MiYo Constitution (L1
- * Code Quality rule on MarkdownRenderer / no innerHTML).
+ * innerHTML — Obsidian plugin guideline + MiYo Constitution L1 Code Quality.
  */
 
 import type { PluginManifest } from "obsidian";
 
-/** Extended manifest shape to include fundingUrl, which Obsidian's PluginManifest
- * type does not officially expose but which is present in manifest.json. */
-interface HakobiManifest extends PluginManifest {
-	fundingUrl?: string | Record<string, string>;
-}
-
 interface HeaderSectionDeps {
-	plugin: { manifest: HakobiManifest };
+	plugin: { manifest: PluginManifest };
 	containerEl: HTMLElement;
+	/**
+	 * Resolves a plugin-relative asset path (e.g. "assets/hakobi_hanko_144.png")
+	 * to a URL the browser can load. Production wires this to
+	 * `app.vault.adapter.getResourcePath(`${manifest.dir}/${rel}`)`. Tests inject
+	 * a stub. When absent, the hanko image is skipped — the text column still
+	 * renders, so unit tests that don't care about the image stay green.
+	 */
+	resolveAsset?: (relativePath: string) => string;
 }
 
 /** Hardcoded GitHub repository URL — the only hard-coded URL in this file. */
 const REPO_URL = "https://github.com/MMoMM-org/miyo-hakobi";
+
+/** Plugin-relative path to the hanko image (144×144 PNG, displayed at 72×72
+ *  CSS pixels for HiDPI sharpness). */
+const HANKO_REL_PATH = "assets/hakobi_hanko_144.png";
+
+/** In-plugin header tagline. Curated identity copy, not the verbose manifest
+ *  description used by Obsidian's plugin listing. */
+const TAGLINE = "Scheduled Vault Import/Export";
 
 /**
  * Parses the human-readable author display name from Obsidian's author string.
@@ -37,43 +64,6 @@ function parseAuthorDisplayName(author: string): string {
 	const angleIdx = author.indexOf("<");
 	if (angleIdx === -1) return author.trim();
 	return author.slice(0, angleIdx).trim();
-}
-
-/**
- * Renders funding links from a fundingUrl value into a parent element.
- * - Record<string,string>: one link per entry, key as label.
- * - string: one link with a generic "Sponsor" label.
- * - undefined/missing: no links rendered.
- */
-function renderFundingLinks(
-	parentEl: HTMLElement,
-	fundingUrl: string | Record<string, string> | undefined,
-): void {
-	if (fundingUrl === undefined) return;
-
-	const createLink = (href: string, label: string): void => {
-		(parentEl as unknown as {
-			createEl(
-				tag: string,
-				opts: { href: string; text: string; cls: string; attr: Record<string, string> },
-			): HTMLElement;
-		}).createEl("a", {
-			href,
-			text: label,
-			cls: "external-link",
-			attr: { target: "_blank", rel: "noopener" },
-		});
-	};
-
-	if (typeof fundingUrl === "string") {
-		createLink(fundingUrl, "Sponsor");
-		return;
-	}
-
-	// Record<string, string>: iterate entries in insertion order
-	for (const [label, url] of Object.entries(fundingUrl)) {
-		createLink(url, label);
-	}
 }
 
 /** Creates a link element and appends it to parentEl using Obsidian's createEl. */
@@ -96,25 +86,30 @@ function appendLink(
 }
 
 /** Appends a text-only span to parentEl using Obsidian's createSpan helper. */
-function appendText(parentEl: HTMLElement, content: string): void {
-	(parentEl as unknown as { createSpan(opts: { text: string }): HTMLElement }).createSpan({
-		text: content,
-	});
+function appendText(parentEl: HTMLElement, content: string, cls?: string): void {
+	(parentEl as unknown as {
+		createSpan(opts: { text: string; cls?: string }): HTMLElement;
+	}).createSpan(cls === undefined ? { text: content } : { text: content, cls });
+}
+
+/** Appends the " · " separator span used between identity-line items. */
+function appendSep(parentEl: HTMLElement): void {
+	appendText(parentEl, " · ", "hakobi-header-sep");
 }
 
 export class HeaderSection {
-	private readonly plugin: { manifest: HakobiManifest };
+	private readonly plugin: { manifest: PluginManifest };
 	private readonly containerEl: HTMLElement;
+	private readonly resolveAsset: ((rel: string) => string) | undefined;
 
 	constructor(deps: HeaderSectionDeps) {
 		this.plugin = deps.plugin;
 		this.containerEl = deps.containerEl;
+		this.resolveAsset = deps.resolveAsset;
 	}
 
 	/**
-	 * Populates a container with the plugin header: name, tagline, author link,
-	 * GitHub repo link, and funding links. Safe to call multiple times (each call
-	 * appends — callers should empty the container first if re-rendering).
+	 * Populates a container with the plugin header.
 	 *
 	 * @param containerEl — target element to render into; overrides the
 	 *   constructor-captured containerEl when provided. The orchestrator
@@ -126,44 +121,52 @@ export class HeaderSection {
 		const target = containerEl ?? this.containerEl;
 
 		// Obsidian's augmented DOM helpers are prototype methods that read `this`,
-		// so we MUST invoke them as methods on the element — yanking the function
-		// off the cast and calling it bare strips `this` and crashes at runtime.
+		// so we MUST invoke them as methods on the element.
 		const targetEl = target as unknown as {
-			createDiv(opts?: { cls?: string; text?: string }): HTMLElement;
+			createDiv(opts?: { cls?: string }): HTMLElement;
+			createEl(
+				tag: string,
+				opts?: { cls?: string; attr?: Record<string, string> },
+			): HTMLElement;
 		};
 
-		// Outer wrapper (createDiv preferred over createEl("div"))
-		const header = targetEl.createDiv({ cls: "hakobi-header" });
-		const headerEl = header as unknown as {
-			createEl(tag: string, opts?: { text?: string; cls?: string }): HTMLElement;
-		};
+		// Left column: text identity
+		const textCol = targetEl.createDiv({ cls: "hakobi-header-text" });
 
-		// Plugin name
-		headerEl.createEl("h1", { text: manifest.name });
+		// Identity line: name vX.Y.Z · Author · GitHub · funding…
+		const identity = (textCol as unknown as {
+			createDiv(opts: { cls: string }): HTMLElement;
+		}).createDiv({ cls: "hakobi-header-identity" });
 
-		// Tagline / description
-		headerEl.createEl("p", { text: manifest.description, cls: "hakobi-tagline" });
+		appendText(identity, manifest.name, "hakobi-plugin-name");
+		appendText(identity, ` v${manifest.version}`);
 
-		// Meta line: author | repo | funding
-		const meta = headerEl.createEl("p", { cls: "hakobi-meta" });
-
-		// Author link — only render an anchor if authorUrl is present; otherwise plain text
 		const authorName = parseAuthorDisplayName(manifest.author ?? "");
-		appendText(meta, "Author: ");
+		appendSep(identity);
 		if (manifest.authorUrl !== undefined) {
-			appendLink(meta, manifest.authorUrl, authorName);
+			appendLink(identity, manifest.authorUrl, authorName);
 		} else {
-			appendText(meta, authorName);
+			appendText(identity, authorName);
 		}
 
-		// Repo link
-		appendText(meta, " | Repo: ");
-		appendLink(meta, REPO_URL, "GitHub");
+		appendSep(identity);
+		appendLink(identity, REPO_URL, "Documentation");
 
-		// Funding links (only if present)
-		if (manifest.fundingUrl !== undefined) {
-			appendText(meta, " | Support: ");
-			renderFundingLinks(meta, manifest.fundingUrl);
+		// Tagline (curated, manifest-independent)
+		(textCol as unknown as {
+			createEl(tag: string, opts: { text: string; cls: string }): HTMLElement;
+		}).createEl("p", { text: TAGLINE, cls: "hakobi-tagline" });
+
+		// Right column: hanko image (only when resolveAsset is wired)
+		if (this.resolveAsset !== undefined) {
+			const src = this.resolveAsset(HANKO_REL_PATH);
+			targetEl.createEl("img", {
+				cls: "hakobi-header-hanko",
+				attr: {
+					src,
+					alt: `${manifest.name} hanko`,
+				},
+			});
 		}
 	}
 }

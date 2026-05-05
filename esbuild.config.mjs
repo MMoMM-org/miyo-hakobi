@@ -41,41 +41,58 @@ function stampManifestForVault() {
 	return manifest;
 }
 
-// Copy plugin assets to build/ and optionally to the in-repo test vault for
-// manual QA. Set `DEPLOY_VAULT=1 npm run build` to enable the vault deploy.
-// Default OFF so CI builds don't trip on a missing vault.
+// Build-time file shuffling. Two independent destinations:
+//   - build/        — populated only on prod runs; used for GitHub releases.
+//   - test vault    — populated whenever DEPLOY_VAULT=1, in BOTH dev (watch)
+//                     and prod modes. The vault path is symlinked / treated as
+//                     a community-plugins install dir, so each rebuild fires
+//                     pjeby/hot-reload and the plugin live-reloads.
+//
+// Decoupling deploy from prod lets `npm run dev:vault` watch + auto-deploy
+// without forcing a minified release build on every keystroke.
+const VAULT_PLUGIN_DIR = "test/Hakobi/.obsidian/plugins/miyo-hakobi";
+
 const copyAssets = {
 	name: "copy-assets",
 	setup(build) {
 		build.onEnd(() => {
-			if (!prod) return;
-
-			mkdirSync("build", { recursive: true });
-			copyFileSync("manifest.json", "build/manifest.json");
-			copyFileSync("styles.css", "build/styles.css");
-
-			if (process.env.DEPLOY_VAULT) {
-				const VAULT_PLUGIN_DIR =
-					"test/Hakobi/.obsidian/plugins/miyo-hakobi";
-				if (existsSync("test/Hakobi/.obsidian")) {
-					mkdirSync(VAULT_PLUGIN_DIR, { recursive: true });
-					copyFileSync(`${outdir}/main.js`, `${VAULT_PLUGIN_DIR}/main.js`);
-					copyFileSync("styles.css", `${VAULT_PLUGIN_DIR}/styles.css`);
-					const stampedManifest = stampManifestForVault();
-					writeFileSync(
-						`${VAULT_PLUGIN_DIR}/manifest.json`,
-						JSON.stringify(stampedManifest, null, "\t") + "\n",
-						"utf8",
-					);
-					console.log(
-						`[deploy] Plugin copied to ${VAULT_PLUGIN_DIR} (version: ${stampedManifest.version})`,
-					);
-				} else {
-					console.warn(
-						"[deploy] DEPLOY_VAULT set but test/Hakobi/.obsidian missing — skipped",
-					);
-				}
+			if (prod) {
+				mkdirSync("build", { recursive: true });
+				mkdirSync("build/assets", { recursive: true });
+				copyFileSync("manifest.json", "build/manifest.json");
+				copyFileSync("styles.css", "build/styles.css");
+				copyFileSync(
+					"assets/hakobi_hanko_144.png",
+					"build/assets/hakobi_hanko_144.png",
+				);
 			}
+
+			if (!process.env.DEPLOY_VAULT) return;
+
+			if (!existsSync("test/Hakobi/.obsidian")) {
+				console.warn(
+					"[deploy] DEPLOY_VAULT set but test/Hakobi/.obsidian missing — skipped",
+				);
+				return;
+			}
+
+			mkdirSync(VAULT_PLUGIN_DIR, { recursive: true });
+			mkdirSync(`${VAULT_PLUGIN_DIR}/assets`, { recursive: true });
+			copyFileSync(`${outdir}/main.js`, `${VAULT_PLUGIN_DIR}/main.js`);
+			copyFileSync("styles.css", `${VAULT_PLUGIN_DIR}/styles.css`);
+			copyFileSync(
+				"assets/hakobi_hanko_144.png",
+				`${VAULT_PLUGIN_DIR}/assets/hakobi_hanko_144.png`,
+			);
+			const stampedManifest = stampManifestForVault();
+			writeFileSync(
+				`${VAULT_PLUGIN_DIR}/manifest.json`,
+				JSON.stringify(stampedManifest, null, "\t") + "\n",
+				"utf8",
+			);
+			console.log(
+				`[deploy] Plugin copied to ${VAULT_PLUGIN_DIR} (version: ${stampedManifest.version})`,
+			);
 		});
 	},
 };

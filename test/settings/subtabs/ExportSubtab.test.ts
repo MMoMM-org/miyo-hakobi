@@ -140,6 +140,16 @@ function makeDeps(overrides: Partial<{
 				(_anchor as HTMLElement & { _menuItems?: typeof items })._menuItems = items;
 			},
 		),
+		// plugin: minimal slice exposing registerDomEvent. Wires the listener
+		// for real so existing .click() simulations in tests keep firing the
+		// handlers (matches the obsidian mock's Plugin.registerDomEvent shape).
+		plugin: {
+			registerDomEvent: vi.fn(
+				(el: HTMLElement, type: string, cb: (ev: Event) => void) => {
+					el.addEventListener(type, cb);
+				},
+			),
+		},
 	};
 }
 

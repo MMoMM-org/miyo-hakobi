@@ -23,6 +23,7 @@
 // can avoid needing a real Obsidian Menu. Production wires this to
 // `new Menu().addItem(...).showAtMouseEvent(...)`.
 
+import { Setting } from "obsidian";
 import type { ImportRule, Rule, RuleId } from "../../domain/rule";
 
 // ---------------------------------------------------------------------------
@@ -66,6 +67,13 @@ export interface ImportSubtabDeps {
 		anchor: HTMLElement,
 		items: { label: string; onClick: () => void }[],
 	): void;
+	plugin: {
+		registerDomEvent(
+			el: HTMLElement,
+			type: string,
+			callback: (ev: Event) => void,
+		): void;
+	};
 }
 
 // ---------------------------------------------------------------------------
@@ -120,30 +128,34 @@ export class ImportSubtab {
 	// -------------------------------------------------------------------------
 
 	private renderEmptyState(containerEl: HTMLElement): void {
-		const desc = containerEl.ownerDocument.createElement("p");
-		desc.className = "hakobi-empty-state";
-		desc.textContent =
-			"Import rules pull files from local folders into your vault on a schedule. " +
-			"Add a rule to ferry your inbox.";
-		containerEl.appendChild(desc);
+		new Setting(containerEl).setName("Rules").setHeading();
 
-		const addBtn = containerEl.ownerDocument.createElement("button");
-		addBtn.textContent = "+ add import rule";
-		addBtn.addEventListener("click", () => {
-			this.clearContainer(containerEl);
-			this.deps.importRuleEditor.renderForCreate(
-				containerEl,
-				(created) => {
-					// Rerender the whole subtab regardless of whether the user saved or
-					// cancelled — this handles both "rule now exists" and "still empty".
-					if (created !== undefined) {
-						void this.deps.scheduler.onRuleChanged(created);
-					}
-					void this.loadAndRender(containerEl);
-				},
+		new Setting(containerEl)
+			.setName("Add an import rule")
+			.setDesc(
+				"Import rules pull files from local folders into your vault on a schedule. " +
+					"Add a rule to ferry your inbox.",
+			)
+			.addButton((btn) =>
+				btn
+					.setButtonText("+ add import rule")
+					.setCta()
+					.onClick(() => {
+						this.clearContainer(containerEl);
+						this.deps.importRuleEditor.renderForCreate(
+							containerEl,
+							(created) => {
+								// Rerender the whole subtab regardless of whether the user saved
+								// or cancelled — this handles both "rule now exists" and "still
+								// empty".
+								if (created !== undefined) {
+									void this.deps.scheduler.onRuleChanged(created);
+								}
+								void this.loadAndRender(containerEl);
+							},
+						);
+					}),
 			);
-		});
-		containerEl.appendChild(addBtn);
 	}
 
 	// -------------------------------------------------------------------------
@@ -154,20 +166,24 @@ export class ImportSubtab {
 		containerEl: HTMLElement,
 		rules: ImportRule[],
 	): Promise<void> {
-		// "+ add import rule" button at the top
-		const addBtn = containerEl.ownerDocument.createElement("button");
-		addBtn.textContent = "+ add import rule";
-		addBtn.addEventListener("click", () => {
-			// Inline-expand pattern: clear the body and render the editor.
-			this.clearContainer(containerEl);
-			this.deps.importRuleEditor.renderForCreate(containerEl, (created) => {
-				if (created !== undefined) {
-					void this.deps.scheduler.onRuleChanged(created);
-				}
-				void this.loadAndRender(containerEl);
-			});
-		});
-		containerEl.appendChild(addBtn);
+		new Setting(containerEl).setName("Rules").setHeading();
+
+		// "+ add import rule" inline-expand button. Inline expand means the click
+		// clears the body and renders the rule editor in-place, not in a Modal.
+		new Setting(containerEl).addButton((btn) =>
+			btn
+				.setButtonText("+ add import rule")
+				.setCta()
+				.onClick(() => {
+					this.clearContainer(containerEl);
+					this.deps.importRuleEditor.renderForCreate(containerEl, (created) => {
+						if (created !== undefined) {
+							void this.deps.scheduler.onRuleChanged(created);
+						}
+						void this.loadAndRender(containerEl);
+					});
+				}),
+		);
 
 		// Render one row per rule
 		for (const rule of rules) {
@@ -185,19 +201,20 @@ export class ImportSubtab {
 		rule: ImportRule,
 		initialEnabled: boolean,
 	): void {
-		const row = containerEl.ownerDocument.createElement("div");
+		const doc = containerEl.ownerDocument;
+		const row = doc.createElement("div");
 		row.className = "hakobi-rule-row";
 		row.setAttribute("data-rule-id", rule.id);
 
-		// Per-device enable toggle
-		const toggleEl = containerEl.ownerDocument.createElement("div");
+		// Per-device enable toggle (col 1, spans both rows of the card)
+		const toggleEl = doc.createElement("div");
 		toggleEl.setAttribute("role", "switch");
 		toggleEl.setAttribute("aria-checked", String(initialEnabled));
 		toggleEl.className = "hakobi-toggle";
 
 		let currentEnabled = initialEnabled;
 
-		toggleEl.addEventListener("click", () => {
+		this.deps.plugin.registerDomEvent(toggleEl, "click", () => {
 			const next = !currentEnabled;
 			currentEnabled = next;
 			toggleEl.setAttribute("aria-checked", String(next));
@@ -210,21 +227,19 @@ export class ImportSubtab {
 		});
 		row.appendChild(toggleEl);
 
-		// Rule name
-		const nameEl = containerEl.ownerDocument.createElement("span");
+		// Identity block (col 2): name + summary + badges stacked vertically
+		const identity = doc.createElement("div");
+		identity.className = "hakobi-rule-identity";
+
+		const nameEl = doc.createElement("span");
 		nameEl.className = "hakobi-rule-name";
 		nameEl.textContent = rule.name;
-		row.appendChild(nameEl);
+		identity.appendChild(nameEl);
 
-		// Source → destination summary
-		const summaryEl = containerEl.ownerDocument.createElement("span");
+		const summaryEl = doc.createElement("span");
 		summaryEl.className = "hakobi-rule-summary";
 		summaryEl.textContent = `${rule.sourcePath} → ${rule.destinationVaultPath}`;
-		row.appendChild(summaryEl);
-
-		// Badges
-		const badgesEl = containerEl.ownerDocument.createElement("span");
-		badgesEl.className = "hakobi-rule-badges";
+		identity.appendChild(summaryEl);
 
 		const badges: string[] = [
 			`every ${rule.everyMinutes}m`,
@@ -235,14 +250,18 @@ export class ImportSubtab {
 		if (rule.dryRun) {
 			badges.push("dry-run");
 		}
+		const badgesEl = doc.createElement("span");
+		badgesEl.className = "hakobi-rule-badges";
 		badgesEl.textContent = badges.join(" · ");
-		row.appendChild(badgesEl);
+		identity.appendChild(badgesEl);
 
-		// Overflow menu button
-		const overflowBtn = containerEl.ownerDocument.createElement("button");
+		row.appendChild(identity);
+
+		// Overflow menu button (col 3, spans both rows)
+		const overflowBtn = doc.createElement("button");
 		overflowBtn.setAttribute("data-action", "overflow");
 		overflowBtn.textContent = "⋯";
-		overflowBtn.addEventListener("click", () => {
+		this.deps.plugin.registerDomEvent(overflowBtn, "click", () => {
 			this.openOverflow(overflowBtn, rule, containerEl, row);
 		});
 		row.appendChild(overflowBtn);

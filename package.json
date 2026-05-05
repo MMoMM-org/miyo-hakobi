@@ -6,7 +6,9 @@
 	"type": "module",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
+		"dev:vault": "DEPLOY_VAULT=1 node esbuild.config.mjs",
 		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+		"build:vault": "DEPLOY_VAULT=1 npm run build",
 		"typecheck": "tsc --noEmit",
 		"test": "vitest run",
 		"test:watch": "vitest",

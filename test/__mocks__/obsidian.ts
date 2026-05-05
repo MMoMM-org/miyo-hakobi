@@ -33,7 +33,20 @@ export interface CachedMetadata {
 // --- App & Workspace ---
 
 export class Component {
-	registerDomEvent = vi.fn();
+	// registerDomEvent: spies on the call AND wires the listener for real,
+	// so production code that switches from raw addEventListener to
+	// registerDomEvent keeps test-fired clicks (el.click(), dispatchEvent)
+	// working. Cleanup is enqueued on the Plugin _cleanupFns list (when the
+	// component is also a Plugin) by being overridden in Plugin's constructor.
+	registerDomEvent: (
+		el: EventTarget,
+		type: string,
+		callback: (ev: Event) => void,
+	) => void = vi.fn(
+		(el: EventTarget, type: string, callback: (ev: Event) => void) => {
+			el.addEventListener(type, callback);
+		},
+	);
 	registerEvent = vi.fn();
 	// registerInterval: tracks call args for spy assertions AND pushes a
 	// clearInterval cleanup onto the Plugin's _cleanupFns list so that
@@ -123,6 +136,18 @@ export class Plugin extends Component {
 			this._cleanupFns.push(() => window.clearInterval(id));
 			return id;
 		});
+
+		// Override registerDomEvent with a spy that wires the listener AND
+		// enqueues a removeEventListener cleanup, replicating the real
+		// Obsidian Plugin.registerDomEvent contract (auto-removal on unload).
+		this.registerDomEvent = vi
+			.fn()
+			.mockImplementation(
+				(el: EventTarget, type: string, callback: (ev: Event) => void) => {
+					el.addEventListener(type, callback);
+					this._cleanupFns.push(() => el.removeEventListener(type, callback));
+				},
+			);
 	}
 
 	loadData = vi.fn(async () => ({}));

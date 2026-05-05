@@ -105,6 +105,17 @@ function makeDeps(
 	// Tests will pick which item to invoke via a helper.
 	const openOverflowMenu: ImportSubtabDeps["openOverflowMenu"] = vi.fn();
 
+	// plugin: minimal slice exposing registerDomEvent. Wires the listener
+	// for real so existing .click() simulations in tests keep firing the
+	// handlers (matches the obsidian mock's Plugin.registerDomEvent shape).
+	const plugin: ImportSubtabDeps["plugin"] = {
+		registerDomEvent: vi.fn(
+			(el: HTMLElement, type: string, cb: (ev: Event) => void) => {
+				el.addEventListener(type, cb);
+			},
+		),
+	};
+
 	return {
 		ruleStore,
 		deviceStore,
@@ -113,6 +124,7 @@ function makeDeps(
 		notices,
 		confirm,
 		openOverflowMenu,
+		plugin,
 		...overrides,
 	};
 }

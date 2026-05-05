@@ -82,13 +82,14 @@ export class GeneralSubtab {
 
 		new Setting(containerEl).setName("Global settings").setHeading();
 
-		// Field: Per-file IO timeout (ms)
+		// Field: Per-file IO timeout — UI in seconds, stored as ms
 		this._addNumericSetting(containerEl, {
-			name: "Per-file IO timeout (ms)",
-			desc: "Maximum time (in milliseconds) allowed for a single file operation before it is abandoned. Default: 10000.",
+			name: "Per-file IO timeout (seconds)",
+			desc: "Maximum time allowed for a single file operation before it is abandoned. Default: 10.",
 			field: "perFileTimeoutMs",
 			getCurrent: () => current,
 			save,
+			displayDivisor: 1000,
 		});
 
 		// Field: Audit retention (days)
@@ -100,22 +101,24 @@ export class GeneralSubtab {
 			save,
 		});
 
-		// Field: Audit max bytes
+		// Field: Audit max log size — UI in MB, stored as bytes
 		this._addNumericSetting(containerEl, {
-			name: "Audit max bytes",
-			desc: "Rotate the audit log when the active NDJSON file exceeds this size in bytes. Default: 10485760 (10 MB).",
+			name: "Max log size (MB)",
+			desc: "Rotate the audit log when the active NDJSON file exceeds this size. Default: 10.",
 			field: "auditMaxBytes",
 			getCurrent: () => current,
 			save,
+			displayDivisor: 1024 * 1024,
 		});
 
-		// Field: Stability-check window (ms)
+		// Field: Stability-check window — UI in seconds, stored as ms
 		this._addNumericSetting(containerEl, {
-			name: "Stability-check window (ms)",
-			desc: "How long a file's mtime must be stable before it is considered safe to copy. Default: 2000.",
+			name: "Stability-check window (seconds)",
+			desc: "How long a file's mtime must be stable before it is considered safe to copy. Default: 2.",
 			field: "stabilityCheckMs",
 			getCurrent: () => current,
 			save,
+			displayDivisor: 1000,
 		});
 
 		// -----------------------------------------------------------------------
@@ -157,24 +160,36 @@ export class GeneralSubtab {
 			field: keyof GlobalSettings;
 			getCurrent: () => GlobalSettings;
 			save: (next: GlobalSettings) => Promise<void>;
+			/**
+			 * If set, the input shows the stored value divided by this number,
+			 * and a parsed input is multiplied back before saving. Used to
+			 * surface ms-as-seconds (1000) and bytes-as-MB (1024*1024). Default
+			 * 1 (no conversion). Display values must still be positive integers.
+			 */
+			displayDivisor?: number;
 		},
 	): void {
+		const divisor = opts.displayDivisor ?? 1;
+		const toDisplay = (stored: number): string => String(stored / divisor);
+
 		new Setting(containerEl)
 			.setName(opts.name)
 			.setDesc(opts.desc)
 			.addText((text) => {
 				text
-					.setValue(String(opts.getCurrent()[opts.field]))
+					.setValue(toDisplay(opts.getCurrent()[opts.field]))
 					.onChange((raw) => {
 						const parsed = Number(raw);
 						// Require a plain positive integer string — reject scientific
 						// notation (e.g. "1e5"), decimals, negatives, and non-numeric input.
+						// The integer constraint is on the display value; storage is always
+						// canonical units (ms / bytes / days).
 						if (!Number.isInteger(parsed) || parsed <= 0 || !/^\d+$/.test(raw.trim())) {
-							// Invalid — reset to the current value
-							text.setValue(String(opts.getCurrent()[opts.field]));
+							text.setValue(toDisplay(opts.getCurrent()[opts.field]));
 							return;
 						}
-						void opts.save({ ...opts.getCurrent(), [opts.field]: parsed });
+						const canonical = parsed * divisor;
+						void opts.save({ ...opts.getCurrent(), [opts.field]: canonical });
 					});
 			});
 	}

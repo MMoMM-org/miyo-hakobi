@@ -6,7 +6,7 @@
  * and the no-innerHTML constraint (verified structurally via anchor count + hrefs).
  */
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 
 // augmentEl is not exported from the mock, so we reconstruct it here by importing
 // from the mock path directly — the mock module uses augmentEl internally in
@@ -66,15 +66,18 @@ describe("HeaderSection", () => {
 		expect(containerEl.textContent).toContain("MiYo Hakobi");
 	});
 
-	it("injects manifest.description text into the container", () => {
+	it("does NOT use manifest.description in the header — the in-plugin tagline is curated separately", () => {
 		const section = new HeaderSection({
 			plugin: { manifest: BASE_MANIFEST },
 			containerEl,
 		});
 		section.render();
-		expect(containerEl.textContent).toContain(
+		// The verbose manifest description is reserved for Obsidian's plugin
+		// listing; the header shows a punchy curated tagline instead.
+		expect(containerEl.textContent).not.toContain(
 			"Scheduled file ferry between local filesystem",
 		);
+		expect(containerEl.textContent).not.toContain("import voice memos");
 	});
 
 	it("renders an <a> with href === manifest.authorUrl containing author display name", () => {
@@ -92,7 +95,7 @@ describe("HeaderSection", () => {
 		expect(authorLink?.textContent).toContain("Marcus Breiden");
 	});
 
-	it("renders an <a> with href === hard-coded GitHub repo URL", () => {
+	it("renders the Documentation link pointing at the GitHub repo URL", () => {
 		const section = new HeaderSection({
 			plugin: { manifest: BASE_MANIFEST },
 			containerEl,
@@ -104,71 +107,43 @@ describe("HeaderSection", () => {
 				a.getAttribute("href") === "https://github.com/MMoMM-org/miyo-hakobi",
 		);
 		expect(repoLink).toBeDefined();
+		// Label is "Documentation" — Obsidian's Community Plugins UI surfaces
+		// the GitHub link itself, so we use the more descriptive label here.
+		expect(repoLink?.textContent).toContain("Documentation");
 	});
 
-	it("renders one <a> per fundingUrl entry when fundingUrl is a Record", () => {
+	it("does NOT render funding links — Obsidian's Community Plugins UI surfaces manifest.fundingUrl on the listing page", () => {
 		const section = new HeaderSection({
 			plugin: { manifest: BASE_MANIFEST },
 			containerEl,
 		});
 		section.render();
 		const anchors = Array.from(containerEl.querySelectorAll("a"));
-
-		const coffeeLink = anchors.find(
-			(a) => a.getAttribute("href") === "https://buymeacoffee.com/mmomm",
-		);
-		expect(coffeeLink).toBeDefined();
-		expect(coffeeLink?.textContent).toContain("Buy Me a Coffee");
-
-		const sponsorLink = anchors.find(
-			(a) =>
-				a.getAttribute("href") === "https://github.com/sponsors/MMoMM-org",
-		);
-		expect(sponsorLink).toBeDefined();
-		expect(sponsorLink?.textContent).toContain("GitHub Sponsor");
+		// None of the funding URLs from BASE_MANIFEST.fundingUrl should appear.
+		const fundingHrefs = [
+			"https://buymeacoffee.com/mmomm",
+			"https://github.com/sponsors/MMoMM-org",
+		];
+		for (const href of fundingHrefs) {
+			const link = anchors.find((a) => a.getAttribute("href") === href);
+			expect(link, `funding link ${href} should not render in the header`).toBeUndefined();
+		}
 	});
 
-	it("renders one <a> with generic label when fundingUrl is a plain string", () => {
-		const manifest = {
+	it("ignores fundingUrl entirely regardless of shape (string, Record, or undefined)", () => {
+		// Plain string fundingUrl — should still produce no funding link
+		const stringFundingManifest = {
 			...BASE_MANIFEST,
 			fundingUrl: "https://example.com/sponsor",
 		};
-		const section = new HeaderSection({
-			plugin: { manifest },
+		const sectionStr = new HeaderSection({
+			plugin: { manifest: stringFundingManifest },
 			containerEl,
 		});
-		section.render();
-		const anchors = Array.from(containerEl.querySelectorAll("a"));
-		const sponsorLink = anchors.find(
-			(a) => a.getAttribute("href") === "https://example.com/sponsor",
-		);
-		expect(sponsorLink).toBeDefined();
-		// Generic label when fundingUrl is a plain string
-		expect(sponsorLink?.textContent?.toLowerCase()).toContain("sponsor");
-	});
-
-	it("renders no funding links when fundingUrl is undefined", () => {
-		const { fundingUrl: _dropped, ...manifestWithoutFunding } = {
-			...BASE_MANIFEST,
-			fundingUrl: undefined as
-				| string
-				| Record<string, string>
-				| undefined,
-		};
-		void _dropped;
-		const section = new HeaderSection({
-			plugin: { manifest: manifestWithoutFunding },
-			containerEl,
-		});
-		section.render();
-		const anchors = Array.from(containerEl.querySelectorAll("a"));
-		// Only author link + GitHub link should be present (no funding links)
-		const fundingLinks = anchors.filter(
-			(a) =>
-				a.getAttribute("href") !== "https://www.mmomm.org" &&
-				a.getAttribute("href") !== "https://github.com/MMoMM-org/miyo-hakobi",
-		);
-		expect(fundingLinks).toHaveLength(0);
+		sectionStr.render();
+		expect(
+			containerEl.querySelector("a[href='https://example.com/sponsor']"),
+		).toBeNull();
 	});
 
 	it("all <a> elements have the external-link class (Obsidian convention)", () => {
@@ -184,19 +159,14 @@ describe("HeaderSection", () => {
 		}
 	});
 
-	it("anchor hrefs are set via DOM attributes, not innerHTML (structural check)", () => {
+	it("renders exactly 2 anchors (author + Documentation) with valid hrefs", () => {
 		const section = new HeaderSection({
 			plugin: { manifest: BASE_MANIFEST },
 			containerEl,
 		});
 		section.render();
-		// If innerHTML were used, the mock's createEl path wouldn't be invoked and
-		// anchors might lack proper class or attribute. We verify by ensuring each
-		// anchor has an explicit href attribute (set via createEl opts.href or
-		// setAttribute, not innerHTML).
 		const anchors = Array.from(containerEl.querySelectorAll("a"));
-		// Expected: author + github + 2 funding = 4
-		expect(anchors).toHaveLength(4);
+		expect(anchors).toHaveLength(2);
 		for (const anchor of anchors) {
 			expect(anchor.getAttribute("href")).toBeTruthy();
 		}
@@ -221,5 +191,52 @@ describe("HeaderSection", () => {
 			a.textContent?.includes("Marcus Breiden"),
 		);
 		expect(authorAnchor).toBeUndefined();
+	});
+
+	// -----------------------------------------------------------------------
+	// Hanko image rendering
+	// -----------------------------------------------------------------------
+
+	it("renders an <img> with the resolved hanko src when resolveAsset is wired", () => {
+		const resolveAsset = vi.fn((rel: string) => `app://stub/${rel}`);
+		const section = new HeaderSection({
+			plugin: { manifest: BASE_MANIFEST },
+			containerEl,
+			resolveAsset,
+		});
+		section.render();
+
+		expect(resolveAsset).toHaveBeenCalledWith("assets/hakobi_hanko_144.png");
+
+		const img = containerEl.querySelector<HTMLImageElement>("img.hakobi-header-hanko");
+		expect(img).not.toBeNull();
+		expect(img?.getAttribute("src")).toBe("app://stub/assets/hakobi_hanko_144.png");
+		// Alt text is required for accessibility — must reference the plugin name
+		expect(img?.getAttribute("alt")).toContain("MiYo Hakobi");
+	});
+
+	it("omits the hanko <img> when resolveAsset is not wired (graceful fallback for tests)", () => {
+		const section = new HeaderSection({
+			plugin: { manifest: BASE_MANIFEST },
+			containerEl,
+		});
+		section.render();
+		const img = containerEl.querySelector("img.hakobi-header-hanko");
+		expect(img).toBeNull();
+	});
+
+	// -----------------------------------------------------------------------
+	// Tagline shortening
+	// -----------------------------------------------------------------------
+
+	it("renders the curated tagline 'Scheduled Vault Import/Export' regardless of manifest.description", () => {
+		const section = new HeaderSection({
+			plugin: { manifest: BASE_MANIFEST },
+			containerEl,
+		});
+		section.render();
+		const tagline = containerEl.querySelector(".hakobi-tagline");
+		expect(tagline).not.toBeNull();
+		expect(tagline?.textContent).toBe("Scheduled Vault Import/Export");
 	});
 });

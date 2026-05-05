@@ -11,6 +11,7 @@
 //
 // Refs: PRD/F2, SDD/ADR-10, T3.9
 
+import { Setting } from "obsidian";
 import type { Rule, RuleId, ExportRule } from "../../types/index";
 import { assertNever } from "../../domain/rule";
 
@@ -52,6 +53,13 @@ export interface ExportSubtabDeps {
 		anchor: HTMLElement,
 		items: { label: string; onClick: () => void }[],
 	): void;
+	plugin: {
+		registerDomEvent(
+			el: HTMLElement,
+			type: string,
+			callback: (ev: Event) => void,
+		): void;
+	};
 }
 
 // ---------------------------------------------------------------------------
@@ -114,33 +122,51 @@ export class ExportSubtab {
 		// Clear previous content
 		this._empty(containerEl);
 
-		// "+ Add export rule" button — always present
-		const addBtn = containerEl.ownerDocument.createElement("button");
-		addBtn.textContent = "+ add export rule";
-		addBtn.addEventListener("click", () => {
-			this.deps.exportRuleEditor.renderForCreate(containerEl, (created) => {
-				if (created !== undefined) {
-					void this.deps.scheduler.onRuleChanged(created);
-				}
-				void this._renderAsync(containerEl);
-			});
-		});
-		containerEl.appendChild(addBtn);
+		new Setting(containerEl).setName("Rules").setHeading();
 
-		if (exportRules.length === 0) {
-			// Empty state
-			const desc = containerEl.ownerDocument.createElement("p");
-			desc.textContent =
-				"Export rules push files from your vault to local folders on a schedule. " +
-				"Add a rule to start.";
-			containerEl.appendChild(desc);
+		const isEmpty = exportRules.length === 0;
+
+		// Empty state pairs the description with the add button in a single
+		// Setting; populated state shows the add button alone above the list.
+		if (isEmpty) {
+			new Setting(containerEl)
+				.setName("Add an export rule")
+				.setDesc(
+					"Export rules push files from your vault to local folders on a schedule. " +
+						"Add a rule to start.",
+				)
+				.addButton((btn) =>
+					btn
+						.setButtonText("+ add export rule")
+						.setCta()
+						.onClick(() => {
+							this._handleAddClick(containerEl);
+						}),
+				);
 			return;
 		}
 
-		// Populated list
+		new Setting(containerEl).addButton((btn) =>
+			btn
+				.setButtonText("+ add export rule")
+				.setCta()
+				.onClick(() => {
+					this._handleAddClick(containerEl);
+				}),
+		);
+
 		for (const rule of exportRules) {
 			this._renderRuleRow(containerEl, rule);
 		}
+	}
+
+	private _handleAddClick(containerEl: HTMLElement): void {
+		this.deps.exportRuleEditor.renderForCreate(containerEl, (created) => {
+			if (created !== undefined) {
+				void this.deps.scheduler.onRuleChanged(created);
+			}
+			void this._renderAsync(containerEl);
+		});
 	}
 
 	// -------------------------------------------------------------------------
@@ -148,12 +174,15 @@ export class ExportSubtab {
 	// -------------------------------------------------------------------------
 
 	private _renderRuleRow(containerEl: HTMLElement, rule: ExportRule): void {
-		const row = containerEl.ownerDocument.createElement("div");
+		const doc = containerEl.ownerDocument;
+		const row = doc.createElement("div");
+		row.className = "hakobi-rule-row";
 		row.setAttribute("data-rule-id", rule.id);
 
 		// --- Per-device enable toggle ---
-		const toggle = containerEl.ownerDocument.createElement("div");
+		const toggle = doc.createElement("div");
 		toggle.setAttribute("role", "switch");
+		toggle.className = "hakobi-toggle";
 
 		// Resolve isEnabled (may be sync or async)
 		const enabledResult = this.deps.deviceStore.isEnabled(rule.id);
@@ -167,7 +196,7 @@ export class ExportSubtab {
 			void enabledResult.then(setToggle);
 		}
 
-		toggle.addEventListener("click", () => {
+		this.deps.plugin.registerDomEvent(toggle, "click", () => {
 			const current = toggle.getAttribute("aria-checked") === "true";
 			setToggle(!current);
 			void (async () => {
@@ -180,18 +209,20 @@ export class ExportSubtab {
 
 		row.appendChild(toggle);
 
-		// --- Rule name ---
-		const nameEl = containerEl.ownerDocument.createElement("span");
+		// --- Identity block: name + summary + badges stacked ---
+		const identity = doc.createElement("div");
+		identity.className = "hakobi-rule-identity";
+
+		const nameEl = doc.createElement("span");
+		nameEl.className = "hakobi-rule-name";
 		nameEl.textContent = rule.name;
-		row.appendChild(nameEl);
+		identity.appendChild(nameEl);
 
-		// --- Source-type-specific summary ---
-		const summaryEl = containerEl.ownerDocument.createElement("span");
+		const summaryEl = doc.createElement("span");
+		summaryEl.className = "hakobi-rule-summary";
 		summaryEl.textContent = sourceSummary(rule);
-		row.appendChild(summaryEl);
+		identity.appendChild(summaryEl);
 
-		// --- Badges ---
-		const badgesEl = containerEl.ownerDocument.createElement("span");
 		const badges: string[] = [
 			`every ${rule.everyMinutes}m`,
 			rule.action,
@@ -209,13 +240,18 @@ export class ExportSubtab {
 			badges.push("dry-run");
 		}
 
+		const badgesEl = doc.createElement("span");
+		badgesEl.className = "hakobi-rule-badges";
 		badgesEl.textContent = badges.join(" · ");
-		row.appendChild(badgesEl);
+		identity.appendChild(badgesEl);
+
+		row.appendChild(identity);
 
 		// --- Overflow menu button ---
-		const overflowBtn = containerEl.ownerDocument.createElement("button");
+		const overflowBtn = doc.createElement("button");
+		overflowBtn.setAttribute("data-action", "overflow");
 		overflowBtn.textContent = "⋯";
-		overflowBtn.addEventListener("click", () => {
+		this.deps.plugin.registerDomEvent(overflowBtn, "click", () => {
 			this.deps.openOverflowMenu(overflowBtn, [
 				{
 					label: "Edit",

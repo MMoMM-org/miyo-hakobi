@@ -1,6 +1,234 @@
-/* Plugin styles — rename selectors to match your plugin ID */
+/* Hakobi Settings — structural layout classes only, colors from Obsidian theme.
+   Inspired by Kado's compact tab-bar + section-label pattern. */
 
-.my-plugin-settings .setting-item-description {
+.hakobi-settings-header {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+	padding: 12px 0 14px 16px;
+}
+
+.hakobi-header-text {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.hakobi-header-identity {
+	font-size: var(--font-small);
+	color: var(--text-muted);
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 0 6px;
+}
+
+.hakobi-header-identity a {
+	color: var(--text-accent);
+}
+
+.hakobi-plugin-name {
+	font-weight: var(--font-semibold);
+	color: var(--text-normal);
+}
+
+.hakobi-header-sep {
+	color: var(--text-faint);
+}
+
+.hakobi-tagline {
+	margin: 4px 0 0 0;
+	font-size: var(--font-small);
+	color: var(--text-muted);
+}
+
+.hakobi-header-hanko {
+	flex: 0 0 auto;
+	display: block;
+	margin-left: auto;
+	/* Image is 144×144 (2× for HiDPI), displayed natively at 72×72.
+	   No CSS resize on the file itself — the asset is pre-scaled. */
+	width: 72px;
+	height: 72px;
+}
+
+/* Tab bar (subtab strip below header) */
+
+.hakobi-tab-bar {
+	display: flex;
+	align-items: center;
+	border-bottom: 1px solid var(--background-modifier-border);
+	margin-bottom: 16px;
+}
+
+.hakobi-tab-strip {
+	display: flex;
+	flex: 1;
+	gap: 4px;
+}
+
+.hakobi-tab {
+	padding: 8px 16px;
+	min-block-size: 44px;
+	cursor: pointer;
+	white-space: nowrap;
+	border: none;
+	border-bottom: 2px solid transparent;
+	background: none;
+	box-shadow: none;
+	font-size: var(--font-small);
+	color: var(--text-muted);
+	transition: color 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.hakobi-tab:hover {
+	color: var(--text-normal);
+}
+
+/* Active tab: bottom-border accent + accent text + soft lift shadow.
+   The .mod-cta selector neutralizes Obsidian's default solid-purple CTA
+   styling that would otherwise paint the entire button background and
+   make the text invisible. We keep the mod-cta class on the active tab
+   only because the SettingsTab tests assert on it; the visual treatment
+   comes from .is-active. */
+.hakobi-tab.is-active,
+.hakobi-tab.mod-cta {
+	background: none;
+	border-bottom-color: var(--interactive-accent);
+	color: var(--interactive-accent);
+	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.hakobi-tab.is-active:hover,
+.hakobi-tab.mod-cta:hover {
+	color: var(--interactive-accent);
+}
+
+/* Subtab body */
+
+.hakobi-settings-body {
+	padding: 4px 0;
+}
+
+.hakobi-section-label {
+	font-size: var(--font-smallest);
+	font-weight: var(--font-semibold);
+	color: var(--text-muted);
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	margin: 18px 0 8px 0;
+}
+
+/* Empty state */
+
+.hakobi-empty-state {
 	color: var(--text-muted);
 	font-size: var(--font-small);
+	margin: 12px 0;
+}
+
+/* Rule row card */
+
+.hakobi-rule-row {
+	display: grid;
+	grid-template-columns: auto 1fr auto;
+	column-gap: 12px;
+	align-items: center;
+	padding: 10px 12px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	margin-bottom: 8px;
+	background-color: var(--background-secondary);
+}
+
+.hakobi-rule-row .hakobi-toggle {
+	grid-column: 1;
+	grid-row: 1 / span 2;
+}
+
+.hakobi-rule-identity {
+	grid-column: 2;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.hakobi-rule-name {
+	font-weight: var(--font-semibold);
+	color: var(--text-normal);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.hakobi-rule-summary {
+	font-size: var(--font-smallest);
+	color: var(--text-muted);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.hakobi-rule-badges {
+	font-size: var(--font-smallest);
+	color: var(--text-faint);
+	margin-top: 2px;
+}
+
+.hakobi-rule-row button[data-action="overflow"] {
+	grid-column: 3;
+	grid-row: 1 / span 2;
+	background: none;
+	border: none;
+	color: var(--text-muted);
+	font-size: 18px;
+	cursor: pointer;
+	padding: 4px 8px;
+}
+
+.hakobi-rule-row button[data-action="overflow"]:hover {
+	color: var(--text-normal);
+}
+
+/* Inline editor card */
+
+.hakobi-rule-editor-inline {
+	padding: 12px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	margin-bottom: 8px;
+	background-color: var(--background-secondary);
+}
+
+/* Toggle switch (per-device enable) */
+
+.hakobi-toggle {
+	width: 36px;
+	height: 20px;
+	border-radius: 10px;
+	background-color: var(--background-modifier-border);
+	position: relative;
+	cursor: pointer;
+	transition: background-color 0.15s;
+	flex: 0 0 auto;
+}
+
+.hakobi-toggle::after {
+	content: "";
+	position: absolute;
+	top: 2px;
+	left: 2px;
+	width: 16px;
+	height: 16px;
+	border-radius: 50%;
+	background-color: var(--background-primary);
+	transition: transform 0.15s;
+}
+
+.hakobi-toggle[aria-checked="true"] {
+	background-color: var(--interactive-accent);
+}
+
+.hakobi-toggle[aria-checked="true"]::after {
+	transform: translateX(16px);
 }

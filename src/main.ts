@@ -396,6 +396,7 @@ export default class HakobiPlugin extends Plugin {
       notices: Notices,
       confirm,
       openOverflowMenu,
+      plugin: this,
     });
 
     const exportSubtab = new ExportSubtab({
@@ -406,6 +407,7 @@ export default class HakobiPlugin extends Plugin {
       notices: Notices,
       confirm,
       openOverflowMenu,
+      plugin: this,
     });
 
     // ------------------------------------------------------------------
@@ -419,6 +421,14 @@ export default class HakobiPlugin extends Plugin {
       // `activeWindow` is an Obsidian runtime global; fall back to `window` in
       // test environments (jsdom) where activeWindow is not defined.
       containerEl: (typeof activeWindow !== "undefined" ? activeWindow : window).document.createElement("div"),
+      // Resolves plugin-relative asset paths (e.g. assets/hakobi_hanko.png) to
+      // a URL the renderer can load. manifest.dir is the plugin's vault-relative
+      // install directory at runtime; getResourcePath turns that into a
+      // file:// URL with cache-busting query, which <img src> can fetch.
+      resolveAsset: (rel: string): string => {
+        const dir = this.manifest.dir ?? `.obsidian/plugins/${this.manifest.id}`;
+        return this.app.vault.adapter.getResourcePath(`${dir}/${rel}`);
+      },
     });
 
     // ------------------------------------------------------------------

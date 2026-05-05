@@ -89,6 +89,11 @@ function makeDeps() {
 	const deps = {
 		plugin: {
 			addStatusBarItem: vi.fn(() => el),
+			registerDomEvent: vi.fn(
+				(target: EventTarget, type: string, cb: (ev: Event) => void) => {
+					target.addEventListener(type, cb);
+				},
+			),
 		},
 		openSettings,
 	};

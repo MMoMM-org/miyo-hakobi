@@ -178,13 +178,15 @@ describe("HakobiPlugin lifecycle", () => {
       expect((plugin as unknown as { _cleanupFns: unknown[] })._cleanupFns).toHaveLength(0);
       expect(vi.getTimerCount()).toBe(0);
 
-      // "all DOM listeners removed" (phase-4.md T4.1.2). Production code does
-      // not currently register DOM events; this assertion locks the surface so
-      // a future addition either gets a corresponding cleanup test OR is
-      // explicitly waived.
-      expect(
-        (plugin.registerDomEvent as ReturnType<typeof vi.fn>).mock.calls.length,
-      ).toBe(0);
+      // "all DOM listeners removed" (phase-4.md T4.1.2). Production now
+      // registers DOM listeners through plugin.registerDomEvent (StatusBar
+      // click handler). Each such call enqueues a removeEventListener cleanup
+      // on _cleanupFns — proven drained at length 0 above. We assert ≥ 1 here
+      // so that if a future change accidentally drops the registerDomEvent
+      // path (and reverts to raw addEventListener), this test fails loudly.
+      const cycle1DomEventCalls =
+        (plugin.registerDomEvent as ReturnType<typeof vi.fn>).mock.calls.length;
+      expect(cycle1DomEventCalls).toBeGreaterThan(0);
 
       // ---------------------------------------------------------------------
       // CYCLE 2 — re-load the same plugin instance and unload again.
@@ -241,13 +243,14 @@ describe("HakobiPlugin lifecycle", () => {
       expect((plugin as unknown as { _cleanupFns: unknown[] })._cleanupFns).toHaveLength(0);
       expect(vi.getTimerCount()).toBe(0);
 
-      // "all DOM listeners removed" (phase-4.md T4.1.2). Production code does
-      // not currently register DOM events; this assertion locks the surface so
-      // a future addition either gets a corresponding cleanup test OR is
-      // explicitly waived.
-      expect(
-        (plugin.registerDomEvent as ReturnType<typeof vi.fn>).mock.calls.length,
-      ).toBe(0);
+      // Same invariant as cycle 1: registerDomEvent kept being used (no
+      // accidental revert to raw addEventListener) AND its cleanups landed
+      // on _cleanupFns, which we drained at length 0 above. The cumulative
+      // call count must have grown by at least the cycle 1 amount — proves
+      // re-onload re-registered the same listeners cleanly.
+      const cycle2DomEventCalls =
+        (plugin.registerDomEvent as ReturnType<typeof vi.fn>).mock.calls.length;
+      expect(cycle2DomEventCalls).toBeGreaterThanOrEqual(cycle1DomEventCalls * 2);
     },
   );
 });
