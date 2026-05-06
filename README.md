@@ -2,9 +2,9 @@
   <img src="assets/hakobi_banner.svg" alt="MiYo Hakobi banner" width="480" />
 </p>
 
-# MiYo Hakobi -- Obsidian File Ferry
+# MiYo Hakobi — Obsidian File Ferry
 
-> Scheduled file ferry between local filesystem and your Obsidian vault — without inviting any cloud-API, daemon, telemetry, or inbound-network trade-offs.
+Scheduled file ferry between your Obsidian vault and local filesystem paths. Voice memos / snippets / captures land in your inbox; folders / tags / notes export out to disk. Local-first, no daemon, no network surface.
 
 > Part of the **MiYo** family. The plugin is referred to as **MiYo Hakobi** in the Obsidian community-plugin index and in the settings UI; "Hakobi" alone is used as a short form throughout this README and the source.
 
@@ -12,211 +12,146 @@
   <img src="assets/hakobi_hanko.png" alt="MiYo Hakobi hanko" width="160" />
 </p>
 
-## Table of Contents
+## Why MiYo Hakobi?
 
-- [What Hakobi does](#what-hakobi-does)
-- [What Hakobi does NOT do](#what-hakobi-does-not-do)
-- [Installation](#installation)
-- [First-run flow](#first-run-flow)
-- [Settings layout](#settings-layout)
-- [Commands](#commands)
-- [Per-device enablement](#per-device-enablement)
-- [Audit log](#audit-log)
-- [Troubleshooting / FAQ](#troubleshooting--faq)
-- [Privacy](#privacy)
-- [Possible future features](#possible-future-features)
-- [Development](#development)
-- [License](#license)
+Most "ferry the files" tooling either (a) lives outside Obsidian and has to be told about your vault separately (Hazel, launchd, cron), or (b) lives inside Obsidian and brings a cloud API along for the ride (Dropbox SDK, Google Drive OAuth, S3 keys). Hakobi is built around a different default:
 
-## What Hakobi does
+- **No network surface.** No ports, no MCP server, no telemetry, no SDKs reaching out. Hakobi reads and writes locally-mounted filesystem paths.
+- **Approval is the rule, not the run.** Creating a rule is the approval moment. After that, ferrying happens silently on each rule's `everyMinutes` schedule.
+- **Per-device opt-in by default.** Newly-synced rules are **off** on every device that didn't create them. No surprise multi-device runs producing "Conflicted copy" files.
+- **Metadata-only audit log.** Every run produces NDJSON entries with paths, operations, byte counts, and timings — but never note content, frontmatter values, or absolute home paths. The field allowlist is enforced at compile time.
 
-Hakobi is an Obsidian community plugin that ferries files between your vault and user-configured **local filesystem paths** on a simple `everyMinutes` schedule.
+If you want voice memos, capture-app exports, or Hazel-bait folders to land in your vault on a schedule — and the reverse for tagged or foldered exports — without inviting a cloud API, daemon, or telemetry, Hakobi is for you. External MCP access for your vault is the job of [MiYo Kado](https://github.com/MMoMM-org/miyo-kado).
 
-- **Import** rules pull files from a local FS folder (e.g. `~/Recordings/`) into a vault folder (e.g. `Inbox/Voice/`). Filenames are sanitized so exotic OS filenames cannot break vault paths or escape via `..`.
-- **Export** rules push vault content out to a local FS path. Three source-types are supported: a **vault folder** (recursive), a **tag** selector (single tag or multiple with `any` / `all`), or a **single note**.
-- Each rule has its own `everyMinutes` schedule. Rule creation is the only approval moment; after that, ferrying happens silently.
-- A small **status-bar indicator** (kanji 運) shows live state — neutral (idle), accent (running), error color (last run failed) — with a tooltip that names the running rule and summarises the last outcome.
-- Every run is recorded in a **metadata-only NDJSON audit log** kept in the plugin data directory. The log records paths, operations, decisions, byte counts, and timings — never file content, never frontmatter values, never absolute home-directory paths.
-- Path traversal and symlinks are refused at scan time. Rules that would loop the vault into itself, or that target the vault root / `.obsidian/` / Hakobi's own data directory, are rejected at save time.
+## Features
+
+- **Two rule types** — `import` (FS → vault) and `export` (vault → FS)
+- **Three export sources** — `folder` (recursive vault subtree), `tag` (one or more tags with `any` / `all` match), `note` (single vault note)
+- **Per-rule schedule** — each rule has its own `everyMinutes` cadence; one timer per enabled rule
+- **Atomic writes** — destination is either the old version or the new version, never partial
+- **Filename sanitization** — NUL bytes, path traversals, and empty names are refused at scan time
+- **Stability check** — import waits for the source's `mtime` to stay quiet for `stabilityCheckMs` before picking it up; no half-written files
+- **Cloud-sync placeholder safe** — stalled placeholders are skipped (logged as `io-timeout`) instead of force-materialized
+- **Per-device toggle** — every rule has an `enabledOnThisDevice` flag stored in a non-synced sibling file
+- **Six command-palette commands** — Run / Run-one / Dry-run for both directions
+- **Audit log** — metadata-only NDJSON with monthly rotation, configurable retention and size cap
+- **Dry-run mode** — every rule supports a dry-run flag; audit log records `would-write` / `would-skip` / `would-suffix` decisions instead of touching files
+- **Status bar 運** — three-state indicator (idle / running / failed) with sticky-failed acknowledgement on click
+
+## Documentation
+
+| Document | Audience | Content |
+|----------|----------|---------|
+| [Installation](docs/installation.md) | Everyone | Community Plugins, BRAT, manual install |
+| [Configuration Guide](docs/configuration.md) | Vault owners | Settings UI walkthrough — General, Import, Export subtabs |
+| [Example Configurations](docs/example-configs.md) | Vault owners | Common rule recipes — voice memos, daily journal, tag bundles |
+| [How It Works](docs/how-it-works.md) | Vault owners + contributors | Architecture, scheduler, audit log, lifecycle |
+| [Commands](docs/commands.md) | Vault owners | The six command-palette entries and what they do |
+| [Audit Log](docs/audit-log.md) | Vault owners | Format, retention, allowlist, NDJSON inspection examples |
+| [Per-device Enablement](docs/per-device.md) | Vault owners | Why your synced rule didn't run; cross-device coordination model |
+| [Troubleshooting / FAQ](docs/troubleshooting.md) | Vault owners | Common issues with concrete fixes |
+| [Development Guide](docs/development.md) | Contributors | Build, test, lint, branching, architecture rules |
+| [Privacy Policy](PRIVACY.md) | Everyone | Network surfaces, local storage, audit-log allowlist, supply chain |
+
+## Quick Start
+
+1. [Install the plugin](docs/installation.md)
+2. Open **Settings → MiYo Hakobi**
+3. The **General** subtab is selected by default — defaults are sensible; leave them be on first run
+4. Switch to **Import** or **Export** and click **+ Add rule**
+5. Pick source + destination, set `everyMinutes`, choose `copy` / `move` and `skip` / `suffix`, save
+6. The status-bar 運 lights up when the first tick fires (within `everyMinutes`, plus a 3-second initial-run grace at plugin start)
+
+For ready-made recipes — voice memos, journal export, tag-bundle publish — see [Example Configurations](docs/example-configs.md).
+
+## Screenshots
+
+**General subtab** — header section (plugin identity + hanko) plus global settings (per-file IO timeout, audit retention / size, stability check window) and the audit-log inspect / purge buttons.
+
+<p align="center">
+  <img src="assets/hakobi_general_settings.png" alt="Hakobi General settings tab" width="720" />
+</p>
+
+**Import subtab** — list of import rules. Each row shows the per-device toggle, name + summary, badges (`every Nm · copy/move · skip/suffix · mirror/flatten`), and an overflow `⋯` menu (Edit / Run now / Run dry-run / Delete).
+
+<p align="center">
+  <img src="assets/hakobi_import_with_existing_rule.png" alt="Hakobi Import subtab" width="720" />
+</p>
+
+**Export subtab** — same shape as Import. Source-type can be `folder` (recursive vault subtree), `tag` (one or more tags with `any`/`all` match), or `note` (single vault note).
+
+<p align="center">
+  <img src="assets/hakobi_export_rules_with_rules.png" alt="Hakobi Export subtab" width="720" />
+</p>
+
+## Roadmap
+
+These are ideas under consideration, not commitments:
+
+- **Active-note one-shot export** — a fuzzy-suggester command that lists configured export rules and runs the chosen one against the active note.
+- **File-menu integration** — a right-click `Export via rule…` entry on notes in the file explorer (PRD F12, deferred from v0.1).
+- **Settings import / export** — backup / restore of the rule definitions.
+
+## Architecture
+
+```
+NodeFs → VaultIo → AuditLog + Rotation → RuleStore → DeviceStore
+       → InFlightRegistry → ImportRunner + ExportRunner → StatusBar
+       → Scheduler → SettingsTab → CommandRegistry
+```
+
+Layered, downward-only dependency flow. The **domain** layer (validation, sanitization) is pure — no `obsidian` import, no `node:fs` — so the entire validation model is testable without either runtime. See [How It Works](docs/how-it-works.md) for the full architecture.
 
 ## What Hakobi does NOT do
 
-The following are explicitly **out of scope** for v0.1 and will not arrive without a Constitution review:
+The following are explicitly **out of scope** for v0.1 and will probably never arrive:
 
-- **No external network surface.** No ports, no MCP server, no inbound HTTP listener, no IPC socket. (External access to your vault is the job of [MiYo Kado](https://github.com/MMoMM-org/miyo-kado).)
+- **No external network surface.** No ports, no MCP server, no inbound HTTP, no IPC socket. (External MCP access to your vault is the job of [MiYo Kado](https://github.com/MMoMM-org/miyo-kado).)
 - **No native cloud-service APIs.** No Dropbox HTTP, no Google Drive REST, no S3, no SFTP, no WebDAV. Hakobi only reads and writes locally-mounted FS paths. Cloud-sync folders that mount as local paths (Dropbox, iCloud Drive, OneDrive, Google Drive's local mirror, Syncthing) are in scope as plain local paths — your trust decision.
 - **No mobile support.** `isDesktopOnly: true`.
-- **No per-execution approval prompts.** Creating the rule IS the approval. Once saved, a rule runs silently on its schedule.
+- **No per-execution approval prompts.** Creating the rule IS the approval.
 - **No LLM / AI integration of any kind**, even passively.
 - **No coupling to other MiYo components** (Tomo, Hashi, Kado, Seigyo) in v0.1.
 - **No daemon / system-service mode.** Hakobi runs only while Obsidian is open.
 - **No cron expressions.** Only `everyMinutes`.
 - **No make-up runs** for ticks missed while Obsidian was closed or the machine was asleep.
 - **No forced materialization** of cloud-sync placeholder files. Stalled placeholders are skipped + logged.
-- **No telemetry, analytics, or crash reporting.** Ever. See [PRIVACY.md](PRIVACY.md).
+- **No telemetry, analytics, or crash reporting.** Ever. See [Privacy Policy](PRIVACY.md).
 
-## Installation
+## Part of MiYo
 
-### Community Plugins (after listing)
+Hakobi is part of [**MiYo**](https://github.com/MMoMM-org), a small family of Obsidian-adjacent tools focused on giving you control over what your assistants and your filesystem can see and do. Hakobi is the file-ferry component — the piece that moves bytes between your vault and disk on a schedule. Sibling components handle different concerns:
 
-1. Open Obsidian Settings → Community Plugins
-2. Search for **MiYo Hakobi**
-3. Install and enable
+- [**MiYo Kado**](https://github.com/MMoMM-org/miyo-kado) — security-first MCP gateway.
+- [**MiYo Tomo**](https://github.com/MMoMM-org/miyo-tomo) / [**MiYo Tomo Hashi**](https://github.com/MMoMM-org/miyo-tomo-hashi) — Claude Code AI workflows + Obsidian session UI.
 
-### Manual
 
-1. Download `main.js`, `manifest.json`, and `styles.css` from the [latest release](https://github.com/MMoMM-org/miyo-hakobi/releases/latest)
-2. Create folder `<vault>/.obsidian/plugins/miyo-hakobi/`
-3. Copy the downloaded files into that folder
-4. Restart Obsidian, then enable the plugin in Settings → Community Plugins
+### Open tracking
 
-### BRAT (Beta)
+Live issues live in [GitHub Issues](https://github.com/MMoMM-org/miyo-hakobi/issues).
 
-1. Install [BRAT](https://github.com/TfTHacker/obsidian42-brat)
-2. Add beta plugin: `MMoMM-org/miyo-hakobi`
+## Support
 
-## First-run flow
+If MiYo Hakobi is useful to you and you want to help me keep building, you can support development via:
 
-1. Open Obsidian → Settings → **Hakobi**.
-2. You will see a **header** (plugin name, tagline, author/docs/funding links from `manifest.json`) above a row of three subtabs: **General**, **Import**, **Export**.
-3. The **General** subtab is selected by default. Adjust global settings if you need to (defaults are sensible).
-4. Switch to **Import** or **Export** and click **Add rule**. Name the rule, pick source and destination, set `everyMinutes`, choose `copy | move` and `skip | suffix`, save.
-5. Saving sets `enabledOnThisDevice: true` for the device you used to create the rule. The scheduler starts the timer immediately.
-6. Watch the status-bar kanji 運 — it turns the accent color while a run is in flight and the error color if a run fails.
+- [Buy Me a Coffee](https://ko-fi.com/mmomm)
+- [GitHub Sponsors](https://github.com/sponsors/MMoMM-org)
 
-## Settings layout
+Issues and pull requests are also very welcome.
 
-The Hakobi settings tab has a fixed header section followed by three subtabs.
+## Contributing
 
-### General subtab
+Contributions are welcome. The short version:
 
-- **Per-file IO timeout (ms)** — applies to every per-file read/write across all rules. Default `10000`. Increase if you ferry to/from slow paths (NAS, large cloud-sync placeholders).
-- **Audit retention (days)** — files older than this are pruned at the next rotation. Default `90`.
-- **Audit max size (MB)** — per-file cap. Default `10`. Once exceeded, the file rotates.
-- **Stability check window (ms)** — how long an import-source file's mtime must be unchanged before Hakobi picks it up. Default `2000`. Prevents picking up half-written files mid-copy by another agent.
-- **`Show audit log`** button — opens the **current month's** `YYYY-MM.ndjson` file in your OS default app for `.ndjson`. There is no in-tab viewer; inspect with whatever tool you prefer (text editor, `grep`, `jq`).
-- **`Purge audit log now`** button — requires explicit confirmation in a dialog; deletes every NDJSON file under the audit directory and writes a single post-purge marker entry to a fresh log.
+1. **Open an issue first** for anything non-trivial (bugs, features, refactors) so we can align on scope before you invest time.
+2. **Fork & branch** from `main`. Use a descriptive branch name (e.g. `fix/import-stability-check`, `feat/file-menu-export`).
+3. **Keep changes focused** — one feature or one fix per PR. See [Development Guide](docs/development.md) for build, test, and lint commands.
+4. **Tests & lint must pass** — run `npm run build`, `npm test`, and `npm run lint` before pushing.
+5. **Conventional commits** — `feat:`, `fix:`, `docs:`, `refactor:`. Release notes are generated from commit history.
+6. **Open a PR** against `main` and reference the issue. Small, reviewable diffs get merged fastest.
 
-### Import subtab
-
-- Empty state: "Add import rule" button.
-- Once configured: a list of rules. Each row shows the rule name, source → destination paths, `everyMinutes`, action (`copy` / `move`), collision policy, flat-target flag, an overflow menu (`⋯`), and a per-device enable toggle (`✓`).
-- Overflow menu: **Edit** / **Run now** / **Run dry-run** / **Delete**.
-
-### Export subtab
-
-Same shape as Import. Source-type can be **folder** (vault subtree, recursive), **tag** (single tag or multiple with `tagMatch: any | all`), or **note** (a single vault note).
-
-## Commands
-
-Hakobi registers exactly six commands. Obsidian auto-prefixes commands with the plugin name in the command palette, so they appear as `Hakobi: …`.
-
-- `Run all import rules`
-- `Run an import rule…`
-- `Run all export rules`
-- `Run an export rule…`
-- `Dry-run an import rule…` — runs the rule without writing anything; the audit log records `would-write` / `would-skip` / `would-suffix` decisions.
-- `Dry-run an export rule…` — same, for export rules.
-
-If you invoke a `Run …` command while the same rule is already in flight, it is no-op'd and a `Rule already running` notice appears. There is no queueing in v0.1.
-
-## Per-device enablement
-
-This is the most-likely-to-confuse aspect of Hakobi. Read it once.
-
-- **Rule definitions** live in `<vault>/.obsidian/plugins/miyo-hakobi/data.json`. If you have **Obsidian Sync** enabled and configured to sync plugin data, rule definitions replicate to your other devices.
-- **Per-device flags** (`enabledOnThisDevice` per rule, last-run timestamps, transient run state) live in a sibling file `<vault>/.obsidian/plugins/miyo-hakobi/device.json`. Obsidian Sync **does not replicate this file** — it sits outside the `loadData`/`saveData` channel by design.
-- A rule that arrives on a new device via Sync defaults to `enabledOnThisDevice: false` on that device. **You must explicitly enable each rule on every device that should run it.**
-- This is intentional. Without it, every device would fire the same export to a shared cloud-synced destination at the same `everyMinutes` cadence and produce "Conflicted copy" files. Hakobi does not coordinate or warn about multi-device enablement — it expects you to enable each rule on exactly one device unless you specifically want concurrent runs.
-
-If a rule "doesn't run", this is almost always why. Check the toggle on the right edge of each rule row.
-
-## Audit log
-
-- **Location:** `<vault>/.obsidian/plugins/miyo-hakobi/audit/YYYY-MM.ndjson`. Rotated monthly.
-- **Format:** newline-delimited JSON. Each line is one entry — either a per-file entry or a rule-level summary entry (one summary per run).
-- **Retention:** defaults to **10 MB per file** and **90 days**, both adjustable on the General subtab. Rotation is opportunistic (checked at run time, not on a separate timer).
-- **Scope:** **metadata only.** The writer enforces a closed allowlist of fields (`timestamp`, `ruleId`, `ruleName`, `direction`, `operation`, `decision`, `sourcePathRelative`, `destinationPathRelative`, `errorCode`, `bytesTransferred`, `durationMs`). Any attempt to record a field outside the allowlist is a build-time error in the writer. The audit log NEVER contains file content, frontmatter values, absolute home paths, or vault-root paths. See [PRIVACY.md](PRIVACY.md#audit-log-scope) for the full contract.
-- **Cross-plugin readability:** Obsidian gives every installed plugin filesystem access to every other plugin's data directory. Hakobi cannot prevent this; the audit log is metadata-only by design so a hostile or compromised plugin reading it sees rule names, relative paths, operations, and timings — not your note content. See [PRIVACY.md](PRIVACY.md#cross-plugin-readability).
-- **Inspection:** click `Show audit log` in Settings → Hakobi → General. There is no in-tab viewer in v0.1; inspection is delegated to your OS default app for `.ndjson`.
-
-## Troubleshooting / FAQ
-
-### My rules don't run
-
-Verify `enabledOnThisDevice` is **on** for each rule on this device. Open Settings → Hakobi → Import (or Export) and look at the toggle at the right edge of each rule row.
-
-Newly-Synced rules from another device default to **disabled** on each new device. This is intentional — see [Per-device enablement](#per-device-enablement).
-
-### "Show audit log" doesn't open the file
-
-The button asks your OS to open the current month's `YYYY-MM.ndjson` in whatever application is registered as the default for the `.ndjson` extension. If nothing is registered, nothing happens.
-
-Most modern text editors handle `.ndjson` (BBEdit, VSCode, Sublime Text, IntelliJ). On first use you may need to right-click the file in Finder / Explorer once → "Open With" → pick your editor → check "Set default" or "Always use this app". After that, the button works.
-
-If no audit log file exists yet (you just installed Hakobi and no rule has ever run), you will see a `No audit log entries yet` notice instead.
-
-### Hakobi stopped doing things while my laptop was asleep
-
-Hakobi runs **only while Obsidian is open**. There is no daemon and no make-up runs for missed ticks. When you wake the machine and Obsidian regains focus, the next regularly scheduled tick fires normally — but Hakobi does not back-fill the ticks it missed during sleep.
-
-If you need around-the-clock ferrying, that is explicitly outside Hakobi's v0.1 charter; consider a Hazel rule, a launchd / systemd unit, or a shell-script cron for that path.
-
-### Import sometimes skips a file
-
-A few possibilities, all visible in the audit log:
-
-- **Stalled cloud-sync placeholder.** Hakobi waits up to `perFileTimeoutMs` (default 10s) for a per-file IO operation to complete. Cloud providers (iCloud Drive, OneDrive Files-On-Demand) keep "placeholder" files that materialize on access; if materialization stalls past the timeout, Hakobi skips the file with `errorCode: io-timeout`. Hakobi never force-materializes placeholders in v0.1.
-- **OS housekeeping file.** Files like `.DS_Store`, `Thumbs.db`, `desktop.ini`, `.localized` are skipped by default with `errorCode: housekeeping-file`.
-- **Sanitization rejection.** Filenames containing NUL bytes, attempted path traversals (`..`), or that reduce to empty after stripping control characters are refused with `decision: rejected, reason: sanitization`.
-- **Stability check.** A file whose mtime is changing (still being written by another agent) is held back until `stabilityCheckMs` of mtime quiet has elapsed.
-
-Open the audit log to see the exact `decision` + `errorCode` per file.
-
-### My rule "looped" the vault
-
-It didn't — Hakobi refuses at **save time** to create a rule that:
-
-- has both source and destination inside the vault (vault → vault loops), or
-- targets the vault root, `.obsidian/`, or Hakobi's own plugin data directory.
-
-If you tried to save such a rule, you saw a validation error explaining which boundary you hit.
-
-### Two devices running the same rule produced "Conflicted copy" files
-
-Per-device enable flags (`enabledOnThisDevice`) default to `false` on each newly-Synced device specifically to prevent this. Pick **one** device that should run each rule. See [Per-device enablement](#per-device-enablement).
-
-### "Why does my import rule keep picking up the same file twice?"
-
-If your import source folder is *itself* the destination of an Obsidian Sync replica from another device (e.g. you point Hakobi at `~/Library/Mobile Documents/iCloud~md~obsidian/Documents/Captures/` while another device is also Syncing into that folder), Hakobi can pick the file up before Sync has finished materializing it on this machine, or pick it up on multiple devices. The primary defence is the per-device `enabledOnThisDevice` flag — keep the import rule enabled on exactly one device. Prefer configuring import sources to point at local capture folders that Obsidian Sync does **not** write into.
-
-## Privacy
-
-Hakobi is local-first with no telemetry, no analytics, and no network surfaces. The full privacy contract — including the closed audit-log field allowlist, the symlink-refusal rationale, and the cross-plugin-readability disclosure — lives in **[PRIVACY.md](PRIVACY.md)**.
-
-## Possible future features
-
-These are ideas that have been considered but are not committed to any release. No promises, no timelines.
-
-- **Export the active note via a chosen rule** — one-shot active-note export with a fuzzy-suggester modal that lists configured export rules. Currently you can configure a `type: note` export rule for any specific note and run it via `Run an export rule…`.
-- **File-menu integration (`Export via rule…`)** — a right-click entry on notes in the file explorer that lists configured export rules and runs the chosen one against that note. Equivalent reach as the command-palette flow but discoverable from the explorer. Was tracked as PRD F12 (Could-Have) in v0.1 and intentionally deferred.
-
-## Development
-
-```bash
-git clone https://github.com/MMoMM-org/miyo-hakobi.git
-cd miyo-hakobi
-git config core.hooksPath .githooks
-npm install
-npm run dev          # esbuild watch mode
-npm run build        # type-check + esbuild production build
-npm test             # vitest unit tests
-npm run lint         # eslint with eslint-plugin-obsidianmd
-npm run typecheck    # tsc --noEmit
-```
-
-`npm run dev` watches `src/` and rebuilds `main.js` on change. To live-test in Obsidian, point the watcher's output at your dev vault's `.obsidian/plugins/miyo-hakobi/` directory and use Obsidian's "Reload app without saving" command (or the Hot-Reload plugin) after each rebuild.
+For security issues, please **do not** open a public issue — email **marcus@mmomm.org** instead.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+[MIT](LICENSE)
