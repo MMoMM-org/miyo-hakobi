@@ -1,6 +1,6 @@
 {
 	"name": "miyo-hakobi",
-	"version": "0.0.0",
+	"version": "0.1.0",
 	"description": "Scheduled file ferry between local filesystem and your Obsidian vault — import voice memos / snippets / etc. into your inbox, export folders / tags / notes to external locations.",
 	"main": "main.js",
 	"type": "module",
