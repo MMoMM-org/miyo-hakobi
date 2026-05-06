@@ -1,3 +1,10 @@
+## [0.1.1](https://github.com/MMoMM-org/miyo-hakobi/compare/0.1.0...0.1.1) (2026-05-06)
+
+
+### Bug Fixes
+
+* **manifest:** align description with community-plugins.json entry ([5ac2053](https://github.com/MMoMM-org/miyo-hakobi/commit/5ac2053166d8c229a51edb0fc0ce0c1039d6deae)), closes [obsidianmd/obsidian-releases#12587](https://github.com/obsidianmd/obsidian-releases/issues/12587)
+
 # [0.1.0](https://github.com/MMoMM-org/miyo-hakobi/compare/0.0.0...0.1.0) (2026-05-06)
 
 
