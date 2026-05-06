@@ -253,17 +253,18 @@ export class NodeFs {
   ): Promise<T> {
     const timeoutMs = this.timeoutMsFn();
 
-    // We use the global `setTimeout`/`clearTimeout` (Node + DOM lib) rather
-    // than `activeWindow.setTimeout` here on purpose: NodeFs is the filesystem
+    // We use `window.setTimeout`/`window.clearTimeout` (rather than the bare
+    // globals or `activeWindow.*`) on purpose: NodeFs is the filesystem
     // adapter, invoked by the scheduler from a non-UI code path. It must not
     // couple to any popout window's lifecycle — the timer's job is to bound
-    // a Node fs/promises call, not a UI animation. Cleanup is explicit via
-    // the `finally` block below, so popout-close timer leakage (which is what
-    // the obsidianmd rule guards against) cannot occur here.
-    let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+    // a Node fs/promises call, not a UI animation. Binding to the main
+    // `window` keeps the timer alive across popout opens/closes, while still
+    // satisfying obsidianmd/prefer-active-window-timers (which forbids only
+    // bare `setTimeout` references). Cleanup is explicit via the `finally`
+    // block below.
+    let timeoutHandle: number | undefined;
     const timeoutPromise = new Promise<never>((_resolve, reject) => {
-      // eslint-disable-next-line obsidianmd/prefer-active-window-timers -- adapter is non-UI; see comment above.
-      timeoutHandle = setTimeout(() => {
+      timeoutHandle = window.setTimeout(() => {
         reject(new IoTimeoutError(opName, path, timeoutMs));
       }, timeoutMs);
     });
@@ -282,8 +283,7 @@ export class NodeFs {
       return await Promise.race([wrapped, timeoutPromise]);
     } finally {
       if (timeoutHandle !== undefined) {
-        // eslint-disable-next-line obsidianmd/prefer-active-window-timers -- pairs with setTimeout above.
-        clearTimeout(timeoutHandle);
+        window.clearTimeout(timeoutHandle);
       }
     }
   }

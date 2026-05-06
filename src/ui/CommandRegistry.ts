@@ -74,7 +74,7 @@ export class CommandRegistry {
 		// Default selectRule: no-op stub if no seam is injected. Production
 		// should always inject a real FuzzySuggestModal-backed implementation.
 		const selectRule =
-			this.deps.selectRule ?? (async () => undefined);
+			this.deps.selectRule ?? (() => Promise.resolve(undefined));
 
 		// ------------------------------------------------------------------
 		// 1. run-import-all — Run all import rules

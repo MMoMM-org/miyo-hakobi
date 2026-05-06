@@ -226,16 +226,18 @@ export class Scheduler {
 	private scheduleTimer(rule: Rule): void {
 		const intervalMs = rule.everyMinutes * 60_000;
 
-		// setInterval may return NodeJS.Timeout (object) in Node/vitest environments.
-		// Coerce to number with the unary plus so plugin.registerInterval always
-		// receives a plain number — matching Obsidian's Plugin.registerInterval(id: number)
-		// signature and the mock contract. clearInterval accepts both forms.
+		// We use `window.setInterval`/`window.clearInterval` rather than the
+		// bare globals or `activeWindow.*`. Bare calls fail
+		// obsidianmd/prefer-active-window-timers; `activeWindow.*` would bind
+		// the timer to whichever popout window is focused at scheduling time,
+		// which is not what we want for a background scheduler. Binding to the
+		// main `window` keeps the timer alive across popout open/close cycles,
+		// and `vi.useFakeTimers()` in jsdom intercepts `window.setInterval`
+		// because `window === globalThis` there.
 		//
-		// We intentionally use the global setInterval/clearInterval rather than
-		// activeWindow.setInterval so that vi.useFakeTimers() in tests can intercept
-		// these calls. NodeFs.ts uses the same pattern for the same reason.
-		// eslint-disable-next-line obsidianmd/prefer-active-window-timers -- fake timers need global setInterval
-		const rawId = setInterval(() => {
+		// `window.setInterval` returns `number` in DOM environments, matching
+		// the `Plugin.registerInterval(id: number)` signature directly.
+		const rawId = window.setInterval(() => {
 			// Fire-and-forget the async tick; catch any uncaught rejection to
 			// prevent an unhandled rejection from killing the timer chain.
 			this.executeTick(rule, false).catch((err: unknown) => {
@@ -243,10 +245,8 @@ export class Scheduler {
 			});
 		}, intervalMs);
 
-		const numericId = +rawId;
-		this.plugin.registerInterval(numericId);
-		// eslint-disable-next-line obsidianmd/prefer-active-window-timers -- pairs with setInterval above
-		this.cancelMap.set(rule.id, () => clearInterval(rawId));
+		this.plugin.registerInterval(rawId);
+		this.cancelMap.set(rule.id, () => window.clearInterval(rawId));
 	}
 
 	/** Cancel and remove the timer for a rule if one exists. */

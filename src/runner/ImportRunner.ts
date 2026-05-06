@@ -307,7 +307,7 @@ export class ImportRunner {
           // For vault paths, the "dir" might be empty if at root
           destDir === "" ? "" : destDir,
           destBase,
-          async (p: string) => vaultIo.existsAtVaultPath(p),
+          (p: string) => Promise.resolve(vaultIo.existsAtVaultPath(p)),
         );
         if (!collisionResult.ok) {
           await auditLog.append({

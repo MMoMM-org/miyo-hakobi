@@ -32,8 +32,10 @@
 //    `fileByPath(path)` — thin wrapper around `app.vault.getFileByPath` so
 //    ExportRunner can resolve a vault-relative note path to a TFile without
 //    reaching into Obsidian directly.
-//    `deleteNote(file)` — wraps `app.vault.delete` so ExportRunner's
+//    `deleteNote(file)` — wraps `app.fileManager.trashFile` so ExportRunner's
 //    `action: move` can remove the vault note after the FS write is confirmed.
+//    `trashFile` requires Obsidian ≥ 1.6.6, which matches the plugin's
+//    `minAppVersion` declared in `manifest.json`.
 //    `resolveVaultPath(path)` — converts a vault-relative path to an absolute
 //    FS path via `app.vault.adapter.getBasePath()`. Required by
 //    `VaultIoScopeAdapter` (scope.ts) and ExportRunner's scope validation.
@@ -128,17 +130,22 @@ export class VaultIo {
    *
    * @throws VaultIoError(kind='not-folder') if the path does not resolve to a TFolder.
    */
-  async listFolder(
+  listFolder(
     path: string,
     opts: { recursive: boolean },
   ): Promise<TFile[]> {
+    // Synchronous body — no awaits — but the public contract is async so
+    // callers can compose with other I/O. Returning Promise.resolve /
+    // Promise.reject keeps the contract while satisfying require-await.
     const node = this.app.vault.getAbstractFileByPath(path);
     if (!(node instanceof TFolder)) {
-      throw new VaultIoError("not-folder", path);
+      return Promise.reject(new VaultIoError("not-folder", path));
     }
 
     if (!opts.recursive) {
-      return node.children.filter((c): c is TFile => c instanceof TFile);
+      return Promise.resolve(
+        node.children.filter((c): c is TFile => c instanceof TFile),
+      );
     }
 
     const out: TFile[] = [];
@@ -154,7 +161,7 @@ export class VaultIo {
         }
       }
     }
-    return out;
+    return Promise.resolve(out);
   }
 
   /**
@@ -166,7 +173,10 @@ export class VaultIo {
    *
    * Files with no metadata cache (or no tags) are excluded.
    */
-  async notesByTag(tags: string[], match: "any" | "all"): Promise<TFile[]> {
+  notesByTag(tags: string[], match: "any" | "all"): Promise<TFile[]> {
+    // Synchronous body (metadata cache + getMarkdownFiles are in-memory),
+    // but the public contract is async so callers can compose with other
+    // I/O. See `listFolder` for the same pattern.
     const out: TFile[] = [];
     const files = this.app.vault.getMarkdownFiles();
     for (const file of files) {
@@ -183,7 +193,7 @@ export class VaultIo {
 
       if (matched) out.push(file);
     }
-    return out;
+    return Promise.resolve(out);
   }
 
   /** The currently-active markdown file in the workspace, or null if none. */
@@ -300,19 +310,14 @@ export class VaultIo {
    * Delete a vault note after a successful export write. Used by ExportRunner's
    * `action: move` branch.
    *
-   * We use `vault.delete()` rather than `fileManager.trashFile()` here because
-   * `trashFile` was added in Obsidian v1.6.6 and Hakobi's `minAppVersion` is
-   * 1.5.7 — using it would fail on older Obsidian installs. When the minimum
-   * version is raised to ≥ 1.6.6, replace `vault.delete` with
-   * `fileManager.trashFile` to respect the user's system-trash preference.
-   *
-   * eslint-disable-next-line comment below suppresses the prefer-file-manager-
-   * trash-file warning for exactly this call site.
+   * Routes through `app.fileManager.trashFile()` so deletions respect the
+   * user's "Files and links → Deleted files" preference (Obsidian-managed
+   * `.trash`, system trash, or permanent delete). Added to the Obsidian API
+   * in v1.6.6, which matches `manifest.json`'s `minAppVersion`.
    *
    * Added in T2.6.
    */
   async deleteNote(file: TFile): Promise<void> {
-    // eslint-disable-next-line obsidianmd/prefer-file-manager-trash-file -- trashFile needs Obsidian ≥1.6.6; minAppVersion is 1.5.7
-    await this.app.vault.delete(file);
+    await this.app.fileManager.trashFile(file);
   }
 }

@@ -503,28 +503,29 @@ describe("VaultIo — fileByPath", () => {
 });
 
 // ---------------------------------------------------------------------------
-// deleteNote — delegates to vault.delete (T2.6)
-// Note: uses vault.delete instead of fileManager.trashFile because trashFile
-// requires Obsidian ≥1.6.6 and minAppVersion is 1.5.7.
+// deleteNote — delegates to fileManager.trashFile (T2.6)
+// Routes via fileManager.trashFile so the user's "Deleted files" preference
+// (Obsidian trash / system trash / permanent) is respected. Available since
+// Obsidian 1.6.6, which matches manifest.json minAppVersion.
 // ---------------------------------------------------------------------------
 
 describe("VaultIo — deleteNote", () => {
-	it("calls vault.delete with the TFile", async () => {
+	it("calls fileManager.trashFile with the TFile", async () => {
 		const app = new App();
 		const file = createMockTFile({ path: "Notes/note.md" });
-		vi.mocked(app.vault.delete).mockResolvedValueOnce(undefined);
+		vi.mocked(app.fileManager.trashFile).mockResolvedValueOnce(undefined);
 		const io = new VaultIo(app);
 
 		await io.deleteNote(file);
 
-		expect(app.vault.delete).toHaveBeenCalledWith(file);
+		expect(app.fileManager.trashFile).toHaveBeenCalledWith(file);
 	});
 
-	it("propagates errors from vault.delete", async () => {
+	it("propagates errors from fileManager.trashFile", async () => {
 		const app = new App();
 		const file = createMockTFile({ path: "Notes/note.md" });
-		const boom = new Error("delete failed");
-		vi.mocked(app.vault.delete).mockRejectedValueOnce(boom);
+		const boom = new Error("trash failed");
+		vi.mocked(app.fileManager.trashFile).mockRejectedValueOnce(boom);
 		const io = new VaultIo(app);
 
 		await expect(io.deleteNote(file)).rejects.toBe(boom);
