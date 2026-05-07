@@ -256,7 +256,7 @@ export class ExportRuleEditor {
 					.setDesc("Comma-separated tags to export (each must start with #).")
 					.addText((text) => {
 						text
-							.setPlaceholder("#Project, #work")
+							.setPlaceholder("Project, work")
 							.setValue(tags)
 							.onChange((v) => {
 								tags = v;
