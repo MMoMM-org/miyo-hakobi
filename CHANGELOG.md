@@ -1,3 +1,10 @@
+## [0.1.2](https://github.com/MMoMM-org/miyo-hakobi/compare/0.1.1...0.1.2) (2026-05-07)
+
+
+### Bug Fixes
+
+* **plugin-review:** address ObsidianReviewBot findings ([83c6a4f](https://github.com/MMoMM-org/miyo-hakobi/commit/83c6a4f5480ed35465f915aaea9be922bd7bac2c)), closes [obsidianmd/obsidian-releases#12587](https://github.com/obsidianmd/obsidian-releases/issues/12587)
+
 ## [0.1.1](https://github.com/MMoMM-org/miyo-hakobi/compare/0.1.0...0.1.1) (2026-05-06)
 
 
