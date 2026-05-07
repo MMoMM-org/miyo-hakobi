@@ -111,6 +111,19 @@ describe("HakobiPlugin lifecycle", () => {
         .spyOn(Scheduler.prototype, "stop")
         .mockImplementation(() => {});
 
+      // Stub Rotation.checkAndRotate so onload's fire-and-forget rotation
+      // sweep doesn't reach NodeFs (real fs.readdir + a runWithTimeout
+      // setTimeout). Under vi.useFakeTimers() the fake timer queue is
+      // mocked but libuv FS isn't — when CI's fs.readdir resolves slower
+      // than advanceTimersByTimeAsync(0), the runWithTimeout setTimeout
+      // is still pending at assertion time and getTimerCount() returns 1
+      // instead of 0. Mocking Rotation here keeps this lifecycle test
+      // focused on plugin onload/onunload wiring.
+      const { Rotation } = await import("../../src/audit/Rotation");
+      vi.spyOn(Rotation.prototype, "checkAndRotate").mockResolvedValue(
+        undefined,
+      );
+
       vi.useFakeTimers();
 
       plugin = await makePlugin();

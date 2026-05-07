@@ -111,7 +111,7 @@ export class ImportRuleEditor {
 
 	constructor(deps: ImportRuleEditorDeps) {
 		this.deps = deps;
-		this.chooseFsFolder = deps.chooseFsFolder ?? (async () => undefined);
+		this.chooseFsFolder = deps.chooseFsFolder ?? (() => Promise.resolve(undefined));
 		this.newRuleId = deps.newRuleId ?? (() => crypto.randomUUID() as RuleId);
 	}
 
