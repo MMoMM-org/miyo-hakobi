@@ -1,3 +1,10 @@
+## [0.1.3](https://github.com/MMoMM-org/miyo-hakobi/compare/0.1.2...0.1.3) (2026-05-07)
+
+
+### Bug Fixes
+
+* **settings:** drop # from tags placeholder for sentence-case rule ([9dcf304](https://github.com/MMoMM-org/miyo-hakobi/commit/9dcf3042e4b714c74dc0aaba6c2f7f763530162f)), closes [#Project](https://github.com/MMoMM-org/miyo-hakobi/issues/Project)
+
 ## [0.1.2](https://github.com/MMoMM-org/miyo-hakobi/compare/0.1.1...0.1.2) (2026-05-07)
 
 
