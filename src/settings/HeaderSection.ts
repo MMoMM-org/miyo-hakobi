@@ -11,7 +11,7 @@
  *   │ .hakobi-header-identity                          │  │   <img 72x72>          │
  *   │   Name v0.1.0 · Author · Documentation           │  │                        │
  *   │ .hakobi-tagline                                  │  │                        │
- *   │   <short tagline, first half of manifest desc>   │  │                        │
+ *   │   Scheduled Vault Import/Export                  │  │                        │
  *   └──────────────────────────────────────────────────┘  └────────────────────────┘
  *
  * Tagline: hardcoded `TAGLINE` constant. We deliberately keep this independent
@@ -19,6 +19,13 @@
  * Obsidian shows in its Community Plugins listing (longer, search-friendly),
  * while the in-plugin header tagline is a punchy four-word identity. They serve
  * different audiences.
+ *
+ * Hanko delivery: the PNG is inlined into `main.js` at build time via esbuild's
+ * `dataurl` loader (`esbuild.config.mjs`). This is required because the official
+ * Obsidian Community Plugins installer and BRAT (`src/features/BetaPlugins.ts:31-35`)
+ * only fetch `main.js`, `manifest.json`, and `styles.css` — anything in `assets/`
+ * would 404 on non-developer installs. No runtime asset resolution callback,
+ * no `app.vault.adapter.getResourcePath` plumbing.
  *
  * Funding links: NOT rendered here. Obsidian's Community Plugins UI surfaces
  * `manifest.fundingUrl` automatically on the plugin's listing page, so we don't
@@ -29,26 +36,15 @@
  */
 
 import type { PluginManifest } from "obsidian";
+import hankoUrl from "../../assets/hakobi_hanko_144.png";
 
 interface HeaderSectionDeps {
 	plugin: { manifest: PluginManifest };
 	containerEl: HTMLElement;
-	/**
-	 * Resolves a plugin-relative asset path (e.g. "assets/hakobi_hanko_144.png")
-	 * to a URL the browser can load. Production wires this to
-	 * `app.vault.adapter.getResourcePath(`${manifest.dir}/${rel}`)`. Tests inject
-	 * a stub. When absent, the hanko image is skipped — the text column still
-	 * renders, so unit tests that don't care about the image stay green.
-	 */
-	resolveAsset?: (relativePath: string) => string;
 }
 
 /** Hardcoded GitHub repository URL — the only hard-coded URL in this file. */
 const REPO_URL = "https://github.com/MMoMM-org/miyo-hakobi";
-
-/** Plugin-relative path to the hanko image (144×144 PNG, displayed at 72×72
- *  CSS pixels for HiDPI sharpness). */
-const HANKO_REL_PATH = "assets/hakobi_hanko_144.png";
 
 /** In-plugin header tagline. Curated identity copy, not the verbose manifest
  *  description used by Obsidian's plugin listing. */
@@ -100,12 +96,10 @@ function appendSep(parentEl: HTMLElement): void {
 export class HeaderSection {
 	private readonly plugin: { manifest: PluginManifest };
 	private readonly containerEl: HTMLElement;
-	private readonly resolveAsset: ((rel: string) => string) | undefined;
 
 	constructor(deps: HeaderSectionDeps) {
 		this.plugin = deps.plugin;
 		this.containerEl = deps.containerEl;
-		this.resolveAsset = deps.resolveAsset;
 	}
 
 	/**
@@ -133,7 +127,7 @@ export class HeaderSection {
 		// Left column: text identity
 		const textCol = targetEl.createDiv({ cls: "hakobi-header-text" });
 
-		// Identity line: name vX.Y.Z · Author · GitHub · funding…
+		// Identity line: name vX.Y.Z · Author · Documentation
 		const identity = (textCol as unknown as {
 			createDiv(opts: { cls: string }): HTMLElement;
 		}).createDiv({ cls: "hakobi-header-identity" });
@@ -157,16 +151,14 @@ export class HeaderSection {
 			createEl(tag: string, opts: { text: string; cls: string }): HTMLElement;
 		}).createEl("p", { text: TAGLINE, cls: "hakobi-tagline" });
 
-		// Right column: hanko image (only when resolveAsset is wired)
-		if (this.resolveAsset !== undefined) {
-			const src = this.resolveAsset(HANKO_REL_PATH);
-			targetEl.createEl("img", {
-				cls: "hakobi-header-hanko",
-				attr: {
-					src,
-					alt: `${manifest.name} hanko`,
-				},
-			});
-		}
+		// Right column: hanko image inlined into main.js as a data URI by esbuild's
+		// dataurl loader — no runtime asset resolution required.
+		targetEl.createEl("img", {
+			cls: "hakobi-header-hanko",
+			attr: {
+				src: hankoUrl,
+				alt: `${manifest.name} hanko`,
+			},
+		});
 	}
 }

@@ -52,19 +52,19 @@ function stampManifestForVault() {
 // without forcing a minified release build on every keystroke.
 const VAULT_PLUGIN_DIR = "test/Hakobi/.obsidian/plugins/miyo-hakobi";
 
+// Note: assets/hakobi_hanko_144.png is NOT copied alongside main.js — it is
+// inlined into main.js by the `loader: { '.png': 'dataurl' }` setting below.
+// BRAT (`src/features/BetaPlugins.ts:31-35`) and the official Obsidian
+// Community Plugins installer only fetch main.js, manifest.json, and
+// styles.css, so any sibling asset would 404 on non-developer installs.
 const copyAssets = {
 	name: "copy-assets",
 	setup(build) {
 		build.onEnd(() => {
 			if (prod) {
 				mkdirSync("build", { recursive: true });
-				mkdirSync("build/assets", { recursive: true });
 				copyFileSync("manifest.json", "build/manifest.json");
 				copyFileSync("styles.css", "build/styles.css");
-				copyFileSync(
-					"assets/hakobi_hanko_144.png",
-					"build/assets/hakobi_hanko_144.png",
-				);
 			}
 
 			if (!process.env.DEPLOY_VAULT) return;
@@ -77,13 +77,8 @@ const copyAssets = {
 			}
 
 			mkdirSync(VAULT_PLUGIN_DIR, { recursive: true });
-			mkdirSync(`${VAULT_PLUGIN_DIR}/assets`, { recursive: true });
 			copyFileSync(`${outdir}/main.js`, `${VAULT_PLUGIN_DIR}/main.js`);
 			copyFileSync("styles.css", `${VAULT_PLUGIN_DIR}/styles.css`);
-			copyFileSync(
-				"assets/hakobi_hanko_144.png",
-				`${VAULT_PLUGIN_DIR}/assets/hakobi_hanko_144.png`,
-			);
 			const stampedManifest = stampManifestForVault();
 			writeFileSync(
 				`${VAULT_PLUGIN_DIR}/manifest.json`,
@@ -127,6 +122,9 @@ const context = await esbuild.context({
 	treeShaking: true,
 	outfile: `${outdir}/main.js`,
 	minify: prod,
+	// Inline binary assets (the plugin hanko) as data URIs so the bundle is
+	// fully self-contained — see the comment on `copyAssets` above for why.
+	loader: { ".png": "dataurl" },
 	plugins: [copyAssets],
 });
 

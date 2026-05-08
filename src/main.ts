@@ -412,6 +412,11 @@ export default class HakobiPlugin extends Plugin {
 
     // ------------------------------------------------------------------
     // 19. HeaderSection — always gets containerEl from SettingsTab.render()
+    //
+    // The hanko image is inlined into main.js by esbuild's dataurl loader,
+    // so no runtime asset-path plumbing is needed here. Required for BRAT /
+    // official Community Plugins compatibility, which only fetch main.js,
+    // manifest.json, and styles.css.
     // ------------------------------------------------------------------
     const headerSection = new HeaderSection({
       plugin: this,
@@ -421,14 +426,6 @@ export default class HakobiPlugin extends Plugin {
       // `activeWindow` is an Obsidian runtime global; fall back to `window` in
       // test environments (jsdom) where activeWindow is not defined.
       containerEl: (typeof activeWindow !== "undefined" ? activeWindow : window).document.createElement("div"),
-      // Resolves plugin-relative asset paths (e.g. assets/hakobi_hanko.png) to
-      // a URL the renderer can load. manifest.dir is the plugin's vault-relative
-      // install directory at runtime; getResourcePath turns that into a
-      // file:// URL with cache-busting query, which <img src> can fetch.
-      resolveAsset: (rel: string): string => {
-        const dir = this.manifest.dir ?? `.obsidian/plugins/${this.manifest.id}`;
-        return this.app.vault.adapter.getResourcePath(`${dir}/${rel}`);
-      },
     });
 
     // ------------------------------------------------------------------
