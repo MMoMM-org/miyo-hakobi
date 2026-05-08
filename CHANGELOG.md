@@ -1,3 +1,10 @@
+# [0.2.0](https://github.com/MMoMM-org/miyo-hakobi/compare/0.1.3...0.2.0) (2026-05-08)
+
+
+### Features
+
+* **settings:** inline hanko as data URI for BRAT/manual install compat ([0351722](https://github.com/MMoMM-org/miyo-hakobi/commit/0351722b8fdd3ba37cf98d2a94f5b51f33b10e5e))
+
 ## [0.1.3](https://github.com/MMoMM-org/miyo-hakobi/compare/0.1.2...0.1.3) (2026-05-07)
 
 
