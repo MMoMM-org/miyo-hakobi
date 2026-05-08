@@ -27,7 +27,12 @@ import { describe, it, expect, beforeAll } from "vitest";
 
 const REPO_ROOT = path.resolve(__dirname, "..", "..");
 const BUNDLE_PATH = path.join(REPO_ROOT, "build", "main.js");
-const SIZE_BUDGET_BYTES = 100 * 1024; // 100 KiB
+// 160 KiB. The hanko PNG is inlined as a `dataurl` (esbuild loader) so the
+// release bundle is fully self-contained — required for BRAT and the official
+// Community Plugins installer, both of which only fetch main.js, manifest.json,
+// and styles.css. Pre-scaled 144×144 hanko adds ~44 KiB after base64; 160 KiB
+// leaves ~40 KiB headroom for code growth before the budget needs revisiting.
+const SIZE_BUDGET_BYTES = 160 * 1024;
 
 // Forbidden network APIs — bundle must contain ZERO occurrences of each.
 // Why these exact tokens:

@@ -1,19 +1,13 @@
 /**
  * Tests for HeaderSection — the manifest-driven header above the settings subtab row.
  *
- * Covers: name, description, author link, GitHub repo link, funding links
- * (Record<string,string> | string | undefined), external-link class on all anchors,
- * and the no-innerHTML constraint (verified structurally via anchor count + hrefs).
+ * Covers: name, version, author link, GitHub repo link, no funding links,
+ * inlined hanko image (no runtime resolver), curated tagline, and the
+ * external-link class on all anchors.
  */
 
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 
-// augmentEl is not exported from the mock, so we reconstruct it here by importing
-// from the mock path directly — the mock module uses augmentEl internally in
-// PluginSettingTab.containerEl already, so we just build our own via the same
-// approach: call the Obsidian-augmented createEl helpers on the element.
-// The simplest approach: create a plain div, then wrap it with the mock's
-// PluginSettingTab so containerEl is already augmented.
 import { PluginSettingTab, Plugin, App } from "obsidian";
 import { HeaderSection } from "../../src/settings/HeaderSection";
 
@@ -64,6 +58,20 @@ describe("HeaderSection", () => {
 		});
 		section.render();
 		expect(containerEl.textContent).toContain("MiYo Hakobi");
+	});
+
+	it("renders the manifest-driven identity line with name, version, author link, and Documentation link", () => {
+		const section = new HeaderSection({
+			plugin: { manifest: BASE_MANIFEST },
+			containerEl,
+		});
+		section.render();
+		const identity = containerEl.querySelector(".hakobi-header-identity");
+		expect(identity).not.toBeNull();
+		expect(identity?.textContent).toContain("MiYo Hakobi");
+		expect(identity?.textContent).toContain("v0.0.0");
+		expect(identity?.textContent).toContain("Marcus Breiden");
+		expect(identity?.textContent).toContain("Documentation");
 	});
 
 	it("does NOT use manifest.description in the header — the in-plugin tagline is curated separately", () => {
@@ -186,47 +194,40 @@ describe("HeaderSection", () => {
 		const anchors = Array.from(containerEl.querySelectorAll("a"));
 		const brokenAnchor = anchors.find((a) => a.getAttribute("href") === "");
 		expect(brokenAnchor).toBeUndefined();
-		// And no anchor whose href resolves to the author (none expected at all)
-		const authorAnchor = anchors.find((a) =>
-			a.textContent?.includes("Marcus Breiden"),
+		// Documentation link is the only anchor we expect; the author becomes plain text.
+		const repoAnchor = anchors.find(
+			(a) =>
+				a.getAttribute("href") === "https://github.com/MMoMM-org/miyo-hakobi",
 		);
-		expect(authorAnchor).toBeUndefined();
+		expect(repoAnchor).toBeDefined();
+		expect(anchors).toHaveLength(1);
 	});
 
 	// -----------------------------------------------------------------------
-	// Hanko image rendering
+	// Hanko image rendering (inlined via esbuild dataurl loader — no runtime resolver)
 	// -----------------------------------------------------------------------
 
-	it("renders an <img> with the resolved hanko src when resolveAsset is wired", () => {
-		const resolveAsset = vi.fn((rel: string) => `app://stub/${rel}`);
+	it("renders the hanko <img> without a runtime resolver — src is a non-empty string from the bundled import", () => {
 		const section = new HeaderSection({
 			plugin: { manifest: BASE_MANIFEST },
 			containerEl,
-			resolveAsset,
 		});
 		section.render();
-
-		expect(resolveAsset).toHaveBeenCalledWith("assets/hakobi_hanko_144.png");
-
-		const img = containerEl.querySelector<HTMLImageElement>("img.hakobi-header-hanko");
+		const img = containerEl.querySelector<HTMLImageElement>(
+			"img.hakobi-header-hanko",
+		);
 		expect(img).not.toBeNull();
-		expect(img?.getAttribute("src")).toBe("app://stub/assets/hakobi_hanko_144.png");
+		// In production the loader inlines as `data:image/png;base64,...`; under
+		// vitest/Vite the asset import resolves to a project-relative URL string.
+		// Either is acceptable — what matters is that no runtime resolver was used.
+		const src = img?.getAttribute("src") ?? "";
+		expect(src.length).toBeGreaterThan(0);
 		// Alt text is required for accessibility — must reference the plugin name
 		expect(img?.getAttribute("alt")).toContain("MiYo Hakobi");
 	});
 
-	it("omits the hanko <img> when resolveAsset is not wired (graceful fallback for tests)", () => {
-		const section = new HeaderSection({
-			plugin: { manifest: BASE_MANIFEST },
-			containerEl,
-		});
-		section.render();
-		const img = containerEl.querySelector("img.hakobi-header-hanko");
-		expect(img).toBeNull();
-	});
-
 	// -----------------------------------------------------------------------
-	// Tagline shortening
+	// Tagline
 	// -----------------------------------------------------------------------
 
 	it("renders the curated tagline 'Scheduled Vault Import/Export' regardless of manifest.description", () => {
