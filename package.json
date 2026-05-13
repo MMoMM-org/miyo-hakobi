@@ -1,6 +1,6 @@
 {
 	"name": "miyo-hakobi",
-	"version": "0.2.0",
+	"version": "0.2.1",
 	"description": "Scheduled Vault Import / Export - Files Move. You don't have to. Local Filesystem <=> Vault - Import / Export — import voice memos / snippets / etc. into your inbox, export folders / tags / notes to external locations.",
 	"main": "main.js",
 	"type": "module",

@@ -1,3 +1,10 @@
+## [0.2.1](https://github.com/MMoMM-org/miyo-hakobi/compare/0.2.0...0.2.1) (2026-05-13)
+
+
+### Bug Fixes
+
+* **manifest:** remove email from author field per Obsidian guideline ([e4c96a3](https://github.com/MMoMM-org/miyo-hakobi/commit/e4c96a3cba95d03ff868f49992f2cba23c4bdb56))
+
 # [0.2.0](https://github.com/MMoMM-org/miyo-hakobi/compare/0.1.3...0.2.0) (2026-05-08)
 
 
