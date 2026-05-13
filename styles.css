@@ -131,7 +131,7 @@
 .hakobi-rule-row {
 	display: grid;
 	grid-template-columns: auto 1fr auto;
-	column-gap: 12px;
+	gap: 0 12px;
 	align-items: center;
 	padding: 10px 12px;
 	border: 1px solid var(--background-modifier-border);
