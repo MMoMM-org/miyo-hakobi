@@ -36,6 +36,7 @@ export default tseslint.config(
 		"test/**/helpers.ts",
 		"test/live/_helpers/**",
 		"test/fixtures/**",
+		// eslint-disable-next-line obsidianmd/hardcoded-config-path -- glob pattern for test fixtures; Vault#configDir is unavailable at lint time
 		"test/*/.obsidian/**",
 		"claude-docker-home/**",
 	]),
