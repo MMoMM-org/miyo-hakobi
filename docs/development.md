@@ -39,10 +39,13 @@ Lifecycle cleanup is testable via the mock's `Plugin._runCleanup()` — simulate
 ## Lint
 
 ```bash
-npm run lint         # eslint with eslint-plugin-obsidianmd rules
+npm run lint         # eslint with eslint-plugin-obsidianmd rules + stylelint on styles.css
+npm run lint:css     # stylelint only (CSS browser-compat check)
 ```
 
 The lint config enforces Obsidian-plugin best practices (DOM-listener registration through `registerDomEvent`, prefer `createEl` over `innerHTML`, no direct `document` access where Workspace API exists).
+
+`npm run lint` also runs **stylelint** with `stylelint-no-unsupported-browser-features` against `styles.css`, scoped to the `browserslist` target (`chrome 124` — Obsidian's Electron 30 / Chromium runtime for `minAppVersion` 1.6.6). This reproduces the Obsidian community-plugin submission bot's CSS browser-compat check locally — e.g. `text-decoration` with a style value (`underline wavy`) is flagged as only partially supported; use `border-bottom` for underline-style cues instead. Catching it here avoids a round-trip through the directory reviewer.
 
 ## Test vault
 
