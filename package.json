@@ -34,7 +34,7 @@
 		"globals": "14.0.0",
 		"jiti": "2.6.1",
 		"jsdom": "^26.1.0",
-		"semantic-release": "^24.2.3",
+		"semantic-release": "^25.0.9",
 		"stylelint": "17.13.0",
 		"stylelint-no-unsupported-browser-features": "8.1.1",
 		"tslib": "2.4.0",
