@@ -10,6 +10,7 @@ import {
   type ExportFolderRule,
   type ExportTagRule,
   type ExportNoteRule,
+  type ExportRule,
   assertNever,
 } from "../../src/domain/rule";
 
@@ -479,5 +480,55 @@ describe("validateRule — invalid discriminator combos", () => {
     expect(validateRule(null).ok).toBe(false);
     expect(validateRule("string").ok).toBe(false);
     expect(validateRule(42).ok).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Filesystem path canonicalization
+//
+// Regression: a doubled separator survives every syntactic check but breaks the
+// run-time scope guard, which compares realpath(root) against the stored root
+// as strings — realpath collapses `//`, so the rule looked like an escape from
+// its own source root and failed with forbidden-path.
+// ---------------------------------------------------------------------------
+
+describe("validateRule — filesystem path canonicalization", () => {
+  it("collapses duplicate separators in an import sourcePath", () => {
+    const result = validateRule({
+      ...IMPORT_RAW,
+      sourcePath: "/Users/me//Library/Mobile Documents/Voice Memos",
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect((result.value as ImportRule).sourcePath).toBe(
+        "/Users/me/Library/Mobile Documents/Voice Memos",
+      );
+    }
+  });
+
+  it("trims a trailing separator from an import sourcePath", () => {
+    const result = validateRule({ ...IMPORT_RAW, sourcePath: "/Users/me/Downloads/" });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect((result.value as ImportRule).sourcePath).toBe("/Users/me/Downloads");
+    }
+  });
+
+  it("collapses duplicate separators in every export destinationPath variant", () => {
+    for (const raw of [EXPORT_FOLDER_RAW, EXPORT_TAG_RAW, EXPORT_NOTE_RAW]) {
+      const result = validateRule({ ...raw, destinationPath: "/Users/me//Backup" });
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect((result.value as ExportRule).destinationPath).toBe("/Users/me/Backup");
+      }
+    }
+  });
+
+  it("leaves an already canonical path untouched", () => {
+    const result = validateRule(IMPORT_RAW);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect((result.value as ImportRule).sourcePath).toBe("/Users/me/Downloads");
+    }
   });
 });

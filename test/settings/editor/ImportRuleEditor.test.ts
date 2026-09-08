@@ -499,4 +499,35 @@ describe("ImportRuleEditor", () => {
 		expect(updatedRule).toBeDefined();
 		expect(updatedRule.id).toBe(EXISTING_RULE.id);
 	});
+	// -----------------------------------------------------------------------
+	// Regression: a doubled separator in the source path must not survive Save.
+	// realpath() collapses it, and the run-time scope guard compares the
+	// resolved path against the stored one as strings — so an un-normalized
+	// path was reported as an escape from its own source root (forbidden-path).
+	// -----------------------------------------------------------------------
+
+	it("canonicalizes the source path before persisting it", async () => {
+		const onDone = vi.fn();
+		editor.renderForCreate(container, onDone);
+
+		await fillValidForm(container);
+
+		const srcInput = container.querySelector<HTMLInputElement>(
+			'input[data-field="sourcePath"]',
+		)!;
+		srcInput.value = "/users/m//voice/memos/";
+		srcInput.dispatchEvent(new Event("input"));
+
+		const saveBtn = container.querySelector<HTMLButtonElement>(
+			'button[data-action="save"]',
+		)!;
+		expect(saveBtn.disabled).toBe(false);
+
+		saveBtn.click();
+		await new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+		const addedRule = (deps.ruleStore.add as ReturnType<typeof vi.fn>).mock
+			.calls[0][0] as ImportRule;
+		expect(addedRule.sourcePath).toBe("/users/m/voice/memos");
+	});
 });

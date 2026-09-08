@@ -242,13 +242,16 @@ export default class HakobiPlugin extends Plugin {
       for (const item of items) {
         menu.addItem((i) => i.setTitle(item.label).onClick(item.onClick));
       }
-      // Position relative to anchor using a synthetic MouseEvent
+      // Anchor the menu under the button it belongs to. A synthetic
+      // MouseEvent is not enough here: showAtMouseEvent derives its target
+      // and owning document from the event, and a constructed event carries
+      // neither, which drops the menu at the viewport edge instead of at the
+      // button. showAtPosition takes both explicitly.
       const rect = anchor.getBoundingClientRect();
-      const evt = new MouseEvent("click", {
-        clientX: rect.left,
-        clientY: rect.bottom,
-      });
-      menu.showAtMouseEvent(evt);
+      menu.showAtPosition(
+        { x: rect.left, y: rect.bottom },
+        anchor.ownerDocument,
+      );
     };
 
     // ------------------------------------------------------------------

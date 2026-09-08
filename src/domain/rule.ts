@@ -8,6 +8,7 @@
 // compile error at the assertNever call site.
 
 import { type RuleId } from "./ruleId";
+import { normalizeFsPath } from "../fs/PathSafe";
 
 export type { RuleId };
 
@@ -160,6 +161,30 @@ function validateBase(
   return base;
 }
 
+/**
+ * Canonicalize a user-entered filesystem path: `\` to `/`, runs of `/`
+ * collapsed, trailing separator trimmed.
+ *
+ * Why it happens here: a path like `/Users/me//Documents` passes every
+ * syntactic check (absolute, no `..`) and POSIX resolves it fine, but the
+ * run-time guard in scope.ts compares `realpath(root)` against the declared
+ * root *as strings* — and realpath collapses the doubled separator. The rule
+ * would then be rejected as an escape from its own source root. Normalizing
+ * inside validateRule means every validated Rule — read from data.json or
+ * built by an editor — carries the same spelling realpath returns.
+ *
+ * `normalizeFsPath` throws on NUL bytes and over-cap input; both are integrity
+ * errors that the path checks in the editors already surface, so we hand the
+ * raw value back rather than turning validateRule into a second reporter.
+ */
+function canonicalFsPath(p: string): string {
+  try {
+    return normalizeFsPath(p);
+  } catch {
+    return p;
+  }
+}
+
 function validateImport(
   obj: Record<string, unknown>,
   base: Partial<RuleBase>,
@@ -195,7 +220,7 @@ function validateImport(
     flattenOnTarget: base.flattenOnTarget,
     dryRun: base.dryRun,
     direction: "import",
-    sourcePath: sourcePath as AbsolutePath,
+    sourcePath: canonicalFsPath(sourcePath) as AbsolutePath,
     destinationVaultPath: destinationVaultPath as VaultRelativePath,
   };
   return { ok: true, value: rule };
@@ -238,7 +263,7 @@ function validateExportFolder(
     direction: "export",
     sourceType: "folder",
     sourceVaultPath: sourceVaultPath as VaultRelativePath,
-    destinationPath: destinationPath as AbsolutePath,
+    destinationPath: canonicalFsPath(destinationPath) as AbsolutePath,
   };
   return { ok: true, value: rule };
 }
@@ -307,7 +332,7 @@ function validateExportTag(
     sourceType: "tag",
     tags,
     tagMatch,
-    destinationPath: destinationPath as AbsolutePath,
+    destinationPath: canonicalFsPath(destinationPath) as AbsolutePath,
   };
   return { ok: true, value: rule };
 }
@@ -349,7 +374,7 @@ function validateExportNote(
     direction: "export",
     sourceType: "note",
     sourceVaultNotePath: sourceVaultNotePath as VaultRelativePath,
-    destinationPath: destinationPath as AbsolutePath,
+    destinationPath: canonicalFsPath(destinationPath) as AbsolutePath,
   };
   return { ok: true, value: rule };
 }
