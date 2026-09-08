@@ -1,3 +1,10 @@
+## [0.2.2](https://github.com/MMoMM-org/miyo-hakobi/compare/0.2.1...0.2.2) (2026-09-08)
+
+
+### Bug Fixes
+
+* anchor overflow menu to its button, canonicalize rule filesystem paths ([#14](https://github.com/MMoMM-org/miyo-hakobi/issues/14)) ([4285fc7](https://github.com/MMoMM-org/miyo-hakobi/commit/4285fc7d86b02bde2dd9a04703b0e136cc8d303c))
+
 ## [0.2.1](https://github.com/MMoMM-org/miyo-hakobi/compare/0.2.0...0.2.1) (2026-05-13)
 
 
