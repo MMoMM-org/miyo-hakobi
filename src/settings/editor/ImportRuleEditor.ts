@@ -17,7 +17,7 @@
 import { Setting } from "obsidian";
 import { validateRule } from "../../domain/rule";
 import { validateRuleAtSave } from "../../domain/scope";
-import { expandUserPath } from "../../fs/PathSafe";
+import { expandUserPath, normalizeFsPath } from "../../fs/PathSafe";
 import type { ImportRule, Rule } from "../../domain/rule";
 import type { RuleId } from "../../domain/ruleId";
 
@@ -160,11 +160,8 @@ export class ImportRuleEditor {
 		const revalidate = (): void => {
 			const minutes = parseInt(state.everyMinutes, 10);
 
-			// Expand the source path before passing to validateRule
-			const expandResult = expandUserPath(state.sourcePath);
-			const resolvedSourcePath = expandResult.ok
-				? expandResult.value
-				: state.sourcePath;
+			// Expand + canonicalize the source path before passing to validateRule
+			const resolvedSourcePath = this._resolveSourcePath(state.sourcePath);
 
 			const candidate = {
 				id: existingRule?.id ?? "placeholder-id",
@@ -394,6 +391,25 @@ export class ImportRuleEditor {
 	}
 
 	// -------------------------------------------------------------------------
+	// Path resolution
+	// -------------------------------------------------------------------------
+
+	/** Expand `~`/`$HOME`/`%USERPROFILE%` and canonicalize separators.
+	 *
+	 *  Both steps matter before the path is validated or persisted: the
+	 *  run-time scope guard compares `realpath(sourcePath)` against the stored
+	 *  sourcePath as strings, so a path spelled `/Users/me//Voice Memos` is
+	 *  read as an escape from its own source root. On expansion failure we hand
+	 *  back the raw input and let validation report it. */
+	private _resolveSourcePath(raw: string): string {
+		const expanded = expandUserPath(raw);
+		if (!expanded.ok) return raw;
+		// Safe: expandUserPath already rejected the NUL byte and over-cap
+		// inputs that normalizeFsPath throws on.
+		return normalizeFsPath(expanded.value);
+	}
+
+	// -------------------------------------------------------------------------
 	// Save flow
 	// -------------------------------------------------------------------------
 
@@ -405,10 +421,7 @@ export class ImportRuleEditor {
 	): Promise<void> {
 		const minutes = parseInt(state.everyMinutes, 10);
 
-		const expandResult = expandUserPath(state.sourcePath);
-		const resolvedSourcePath = expandResult.ok
-			? expandResult.value
-			: state.sourcePath;
+		const resolvedSourcePath = this._resolveSourcePath(state.sourcePath);
 
 		if (existingRule === null) {
 			// Create flow
