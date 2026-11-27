@@ -1,3 +1,10 @@
+## [0.2.4](https://github.com/MMoMM-org/miyo-hakobi/compare/0.2.3...0.2.4) (2026-11-27)
+
+
+### Bug Fixes
+
+* **main:** hand the scope guard an absolute plugin dir ([#21](https://github.com/MMoMM-org/miyo-hakobi/issues/21)) ([5718361](https://github.com/MMoMM-org/miyo-hakobi/commit/57183615333c267b1d4b8b9b9abdaac726cc2c95)), closes [#20](https://github.com/MMoMM-org/miyo-hakobi/issues/20)
+
 ## [0.2.3](https://github.com/MMoMM-org/miyo-hakobi/compare/0.2.2...0.2.3) (2026-11-27)
 
 
