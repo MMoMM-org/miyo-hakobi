@@ -1,3 +1,10 @@
+## [0.2.3](https://github.com/MMoMM-org/miyo-hakobi/compare/0.2.2...0.2.3) (2026-11-27)
+
+
+### Bug Fixes
+
+* **scope:** accept Windows drive paths and compare paths separator-agnostic ([#19](https://github.com/MMoMM-org/miyo-hakobi/issues/19)) ([36c633a](https://github.com/MMoMM-org/miyo-hakobi/commit/36c633a544ca8257a0f1d7f53a3f37727c73dad4)), closes [#15](https://github.com/MMoMM-org/miyo-hakobi/issues/15)
+
 ## [0.2.2](https://github.com/MMoMM-org/miyo-hakobi/compare/0.2.1...0.2.2) (2026-09-08)
 
 
