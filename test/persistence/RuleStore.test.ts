@@ -517,9 +517,8 @@ describe("RuleStore.saveGlobalSettings()", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Credential-shape smoke test
+// debugLogging setting (spec 002, T1.3)
 // ---------------------------------------------------------------------------
-
 describe("RuleStore debugLogging setting (spec 002, T1.3)", () => {
 	it("loads as false when debugLogging is missing from data.json", async () => {
 		const adapter = makeFakeAdapter({
@@ -584,6 +583,10 @@ describe("RuleStore debugLogging setting (spec 002, T1.3)", () => {
 		expect(settings).toEqual(custom);
 	});
 });
+
+// ---------------------------------------------------------------------------
+// Credential-shape smoke test
+// ---------------------------------------------------------------------------
 
 describe("Credential-field exclusion smoke test", () => {
 	const CREDENTIAL_RE = /password|token|apiKey|secret|auth|credentials/i;
