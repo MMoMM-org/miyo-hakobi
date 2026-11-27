@@ -814,6 +814,23 @@ describe("ExportRunner — RunStats return value", () => {
     expect(stats).toEqual({ copied: 0, skipped: 0, failed: 0, aborted: true });
   });
 
+  it("flags aborted when the note vanishes between pre-check and enumeration", async () => {
+    const file = createMockTFile({ path: "Notes/MyNote.md", name: "MyNote.md" });
+    const fileByPath = vi.fn<(path: string) => TFile | null>();
+    fileByPath.mockReturnValueOnce(file).mockReturnValue(null);
+    const vault = makeVaultStub({ fileByPath });
+    const audit = makeAuditStub();
+    const { runner } = makeRunner({ vault, audit });
+
+    const stats = await runner.run(makeNoteRule());
+
+    expect(stats).toEqual({ copied: 0, skipped: 0, failed: 0, aborted: true });
+    expect(audit._entries).toHaveLength(1);
+    expect(audit._entries[0].decision).toBe("rule-failed");
+    expect(audit._entries[0].errorCode).toBe("source-not-found");
+    expect(vault.readBinary).not.toHaveBeenCalled();
+  });
+
   it("flags aborted when the destination parent is missing", async () => {
     const fs = makeFsStub({
       lstat: async () => {
