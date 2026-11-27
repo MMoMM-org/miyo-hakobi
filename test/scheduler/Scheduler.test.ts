@@ -23,6 +23,8 @@ import type { RuleId } from "../../src/domain/ruleId";
 import type { ImportRule, ExportFolderRule } from "../../src/domain/rule";
 import type { AuditEntry } from "../../src/audit/AuditEntry";
 import type { RunStats } from "../../src/runner/RunStats";
+import { ActivityTotals, DAILY_SUMMARY_INTERVAL_MS } from "../../src/scheduler/ActivityTotals";
+import { setDebugSource } from "../../src/util/logger";
 
 // ---------------------------------------------------------------------------
 // Factories
@@ -112,6 +114,7 @@ function buildScheduler(opts: {
 	auditLog?: ReturnType<typeof makeAuditLog>;
 	inFlight?: InFlightRegistry;
 	nowFn?: () => Date;
+	activityTotals?: ActivityTotals;
 }) {
 	const rules = opts.rules ?? [];
 	const enabledIds = opts.enabledIds ?? new Set(rules.map((r) => r.id));
@@ -133,6 +136,7 @@ function buildScheduler(opts: {
 		auditLog,
 		inFlight,
 		nowFn: opts.nowFn,
+		activityTotals: opts.activityTotals,
 	});
 
 	return { scheduler, ruleStore, deviceStore, importRunner, exportRunner, statusBar, auditLog };
@@ -153,6 +157,7 @@ describe("Scheduler", () => {
 	afterEach(() => {
 		vi.useRealTimers();
 		vi.clearAllMocks();
+		setDebugSource(null);
 	});
 
 	// -------------------------------------------------------------------------
@@ -171,7 +176,7 @@ describe("Scheduler", () => {
 
 			await scheduler.start();
 
-			expect(plugin.registerInterval).toHaveBeenCalledTimes(2);
+			expect(plugin.registerInterval).toHaveBeenCalledTimes(3);
 		});
 
 		it("does not register a timer for a disabled rule", async () => {
@@ -185,7 +190,7 @@ describe("Scheduler", () => {
 
 			await scheduler.start();
 
-			expect(plugin.registerInterval).toHaveBeenCalledTimes(1);
+			expect(plugin.registerInterval).toHaveBeenCalledTimes(2);
 		});
 
 		it("registers nothing when there are no rules", async () => {
@@ -193,7 +198,7 @@ describe("Scheduler", () => {
 
 			await scheduler.start();
 
-			expect(plugin.registerInterval).toHaveBeenCalledTimes(0);
+			expect(plugin.registerInterval).toHaveBeenCalledTimes(1);
 		});
 
 		it("timer fires the runner after everyMinutes elapses", async () => {
@@ -280,7 +285,7 @@ describe("Scheduler", () => {
 			// Obsidian's Plugin tracks cleanup on unload. Verify it was called with a
 			// numeric ID (coerced from NodeJS.Timeout via unary + in scheduleTimer).
 			const calls = (plugin.registerInterval as MockedFunction<typeof plugin.registerInterval>).mock.calls;
-			expect(calls.length).toBe(1);
+			expect(calls.length).toBe(2);
 			// The ID passed must be coerced to a number (may be NaN in Node env
 			// where Timeout objects don't coerce to a sensible numeric ID — but
 			// the important invariant is that registerInterval is called once per rule).
@@ -337,7 +342,7 @@ describe("Scheduler", () => {
 			await scheduler.start();
 
 			// registerInterval called once for the initial schedule
-			expect(plugin.registerInterval).toHaveBeenCalledTimes(1);
+			expect(plugin.registerInterval).toHaveBeenCalledTimes(2);
 
 			// Change the rule's everyMinutes — await since onRuleChanged is async
 			const updatedRule = { ...rule, everyMinutes: 2 };
@@ -345,7 +350,7 @@ describe("Scheduler", () => {
 			await scheduler.onRuleChanged(updatedRule);
 
 			// registerInterval should now be called again (for the new timer)
-			expect(plugin.registerInterval).toHaveBeenCalledTimes(2);
+			expect(plugin.registerInterval).toHaveBeenCalledTimes(3);
 
 			// Old timer should be cancelled — advance 2 min (new interval): runner fires
 			vi.advanceTimersByTime(2 * 60 * 1000);
@@ -374,7 +379,7 @@ describe("Scheduler", () => {
 			});
 
 			await scheduler.start();
-			expect(plugin.registerInterval).toHaveBeenCalledTimes(1);
+			expect(plugin.registerInterval).toHaveBeenCalledTimes(2);
 
 			// Disable the rule — await since onRuleChanged is async
 			deviceStore.isEnabled.mockResolvedValue(false);
@@ -408,13 +413,13 @@ describe("Scheduler", () => {
 			});
 
 			await scheduler.start();
-			expect(plugin.registerInterval).toHaveBeenCalledTimes(0);
+			expect(plugin.registerInterval).toHaveBeenCalledTimes(1);
 
 			// Enable the rule — await since onRuleChanged is async
 			deviceStore.isEnabled.mockResolvedValue(true);
 			await scheduler.onRuleChanged(rule);
 
-			expect(plugin.registerInterval).toHaveBeenCalledTimes(1);
+			expect(plugin.registerInterval).toHaveBeenCalledTimes(2);
 
 			// Timer fires
 			vi.advanceTimersByTime(5 * 60 * 1000);
@@ -905,6 +910,337 @@ describe("Scheduler", () => {
 			await Promise.resolve();
 			await Promise.resolve();
 			expect(importRunner.run).toHaveBeenCalledTimes(2);
+		});
+	});
+
+	// -------------------------------------------------------------------------
+	// Debug logging switch, activity totals and daily summary (#18)
+	// -------------------------------------------------------------------------
+
+	describe("debug logging and daily summary", () => {
+		let debugSpy: ReturnType<typeof vi.spyOn>;
+		let warnSpy: ReturnType<typeof vi.spyOn>;
+
+		const debugLines = (): string[] => debugSpy.mock.calls.map((c) => String(c[0]));
+		const tickLines = (): string[] =>
+			debugLines().filter((l) => /tick (begin|end|skip)/.test(l));
+		const summaryLines = (): string[] =>
+			debugLines().filter((l) => l.includes("daily summary"));
+		const flush = async (): Promise<void> => {
+			for (let i = 0; i < 6; i++) await Promise.resolve();
+		};
+
+		beforeEach(() => {
+			debugSpy = vi.spyOn(console, "debug").mockImplementation(() => undefined);
+			warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+		});
+
+		afterEach(() => {
+			debugSpy.mockRestore();
+			warnSpy.mockRestore();
+		});
+
+		it("writes no tick lines with the source off (timer, initial run, runOnce, runAll)", async () => {
+			const rule = makeImportRule({ everyMinutes: 1 });
+			const { scheduler } = buildScheduler({ plugin, rules: [rule] });
+
+			await scheduler.start();
+			vi.advanceTimersByTime(60_000);
+			await flush();
+			await scheduler.runInitialRun();
+			await scheduler.runOnce(rule.id, { dryRun: false });
+			await scheduler.runAll("import", { dryRun: true });
+
+			expect(tickLines()).toEqual([]);
+			scheduler.stop();
+		});
+
+		it("writes tick begin and end lines with the source on", async () => {
+			setDebugSource(() => true);
+			const rule = makeImportRule({ name: "Visible Rule" });
+			const { scheduler } = buildScheduler({ plugin, rules: [rule] });
+
+			await scheduler.runOnce(rule.id, { dryRun: true });
+
+			const lines = tickLines();
+			expect(lines).toContain("[Hakobi/Scheduler] tick begin: Visible Rule (import) [dry-run]");
+			expect(lines).toContain(
+				"[Hakobi/Scheduler] tick end: Visible Rule — ok (0 copied, 0 skipped, 0 failed)",
+			);
+		});
+
+		it("writes a tick skip line on overlap with the source on, none with it off", async () => {
+			const rule = makeImportRule();
+			const inFlight = new InFlightRegistry();
+			inFlight.tryAcquire(rule.id);
+			const { scheduler } = buildScheduler({ plugin, rules: [rule], inFlight });
+
+			await scheduler.runOnce(rule.id, { dryRun: false });
+			expect(tickLines()).toEqual([]);
+
+			setDebugSource(() => true);
+			await scheduler.runOnce(rule.id, { dryRun: false });
+			expect(tickLines()).toHaveLength(1);
+			expect(tickLines()[0]).toContain("tick skip");
+		});
+
+		it("writes config loaded and initial run lines with the source off", async () => {
+			const rule = makeImportRule();
+			const { scheduler } = buildScheduler({ plugin, rules: [rule] });
+
+			await scheduler.start();
+			await scheduler.runInitialRun();
+
+			const lines = debugLines();
+			expect(lines.some((l) => l.includes("config loaded: 1 rules (1 enabled"))).toBe(true);
+			expect(lines.some((l) => l.includes("initial run starting (1 enabled rules)"))).toBe(true);
+			expect(lines.some((l) => l.includes("initial run finished"))).toBe(true);
+			scheduler.stop();
+		});
+
+		it("still warns with rule name and message when the runner throws, source off", async () => {
+			const rule = makeImportRule({ name: "Broken Rule" });
+			const importRunner = makeImportRunner();
+			importRunner.run.mockRejectedValue(new Error("disk exploded"));
+			const { scheduler } = buildScheduler({ plugin, rules: [rule], importRunner });
+
+			await scheduler.runOnce(rule.id, { dryRun: false });
+
+			expect(warnSpy).toHaveBeenCalledTimes(1);
+			const line = String(warnSpy.mock.calls[0]?.[0]);
+			expect(line).toContain("Broken Rule");
+			expect(line).toContain("disk exploded");
+		});
+
+		it("records returned, aborted, failed and overlap outcomes in the injected totals", async () => {
+			const totals = new ActivityTotals();
+			const recordReturned = vi.spyOn(totals, "recordReturned");
+			const recordFailed = vi.spyOn(totals, "recordFailed");
+			const recordOverlap = vi.spyOn(totals, "recordOverlap");
+			const rule = makeImportRule();
+			const importRunner = makeImportRunner();
+			const inFlight = new InFlightRegistry();
+			const { scheduler } = buildScheduler({
+				plugin,
+				rules: [rule],
+				importRunner,
+				inFlight,
+				activityTotals: totals,
+			});
+
+			const ok: RunStats = { copied: 2, skipped: 1, failed: 0, aborted: false };
+			importRunner.run.mockResolvedValueOnce(ok);
+			await scheduler.runOnce(rule.id, { dryRun: false });
+			expect(recordReturned).toHaveBeenLastCalledWith(ok, false);
+
+			const aborted: RunStats = { copied: 0, skipped: 0, failed: 0, aborted: true };
+			importRunner.run.mockResolvedValueOnce(aborted);
+			await scheduler.runOnce(rule.id, { dryRun: true });
+			expect(recordReturned).toHaveBeenLastCalledWith(aborted, true);
+
+			importRunner.run.mockRejectedValueOnce(new Error("boom"));
+			await scheduler.runOnce(rule.id, { dryRun: false });
+			expect(recordFailed).toHaveBeenCalledTimes(1);
+
+			inFlight.tryAcquire(rule.id);
+			await scheduler.runOnce(rule.id, { dryRun: false });
+			expect(recordOverlap).toHaveBeenCalledTimes(1);
+			expect(recordReturned).toHaveBeenCalledTimes(2);
+
+			const snap = totals.takeSnapshot();
+			expect(snap).toMatchObject({
+				completedRuns: 1,
+				failedRuns: 2,
+				overlapSkips: 1,
+				filesCopied: 2,
+			});
+		});
+
+		it("records overlap even when the audit append rejects", async () => {
+			const totals = new ActivityTotals();
+			const rule = makeImportRule();
+			const inFlight = new InFlightRegistry();
+			inFlight.tryAcquire(rule.id);
+			const auditLog = makeAuditLog();
+			auditLog.append.mockRejectedValue(new Error("audit down"));
+			const { scheduler } = buildScheduler({
+				plugin,
+				rules: [rule],
+				inFlight,
+				auditLog,
+				activityTotals: totals,
+			});
+
+			await scheduler.runOnce(rule.id, { dryRun: false }).catch(() => undefined);
+
+			expect(totals.takeSnapshot().overlapSkips).toBe(1);
+		});
+
+		it("fires no timer and records no outcome for a rule disabled on this device", async () => {
+			const totals = new ActivityTotals();
+			const rule = makeImportRule({ everyMinutes: 1 });
+			const importRunner = makeImportRunner();
+			const { scheduler } = buildScheduler({
+				plugin,
+				rules: [rule],
+				enabledIds: new Set(),
+				importRunner,
+				activityTotals: totals,
+			});
+
+			await scheduler.start();
+			await scheduler.runInitialRun();
+			vi.advanceTimersByTime(5 * 60_000);
+			await flush();
+
+			expect(importRunner.run).not.toHaveBeenCalled();
+			expect(totals.takeSnapshot()).toMatchObject({
+				completedRuns: 0,
+				failedRuns: 0,
+				overlapSkips: 0,
+				dryRuns: 0,
+			});
+			scheduler.stop();
+		});
+
+		it("flipping the debug source does not change counts or summary timing", async () => {
+			let on = false;
+			setDebugSource(() => on);
+			const rule = makeImportRule({ everyMinutes: 60 });
+			const importRunner = makeImportRunner();
+			importRunner.run.mockResolvedValue({ copied: 3, skipped: 0, failed: 0, aborted: false });
+			const { scheduler } = buildScheduler({ plugin, rules: [rule], importRunner });
+			await scheduler.start();
+
+			await scheduler.runOnce(rule.id, { dryRun: false });
+			on = true;
+			await scheduler.runOnce(rule.id, { dryRun: false });
+			on = false;
+
+			vi.advanceTimersByTime(DAILY_SUMMARY_INTERVAL_MS - 1);
+			expect(summaryLines()).toHaveLength(0);
+			vi.advanceTimersByTime(1);
+			expect(summaryLines()).toHaveLength(1);
+			expect(summaryLines()[0]).toContain("2 completed");
+			expect(summaryLines()[0]).toContain("files 6 copied");
+			scheduler.stop();
+		});
+
+		it("includes initial-run outcomes in the first summary", async () => {
+			const rule = makeImportRule({ everyMinutes: 60 * 48 });
+			const { scheduler } = buildScheduler({ plugin, rules: [rule] });
+			await scheduler.start();
+			await scheduler.runInitialRun();
+
+			vi.advanceTimersByTime(DAILY_SUMMARY_INTERVAL_MS);
+
+			expect(summaryLines()).toHaveLength(1);
+			expect(summaryLines()[0]).toContain("1 completed");
+			scheduler.stop();
+		});
+
+		it("leaks no rule name into lifecycle or summary lines with the source off", async () => {
+			const rule = makeImportRule({ name: "Secret-Client-X", everyMinutes: 60 * 48 });
+			const importRunner = makeImportRunner();
+			const { scheduler } = buildScheduler({ plugin, rules: [rule], importRunner });
+			await scheduler.start();
+			await scheduler.runInitialRun();
+			await scheduler.runOnce(rule.id, { dryRun: false });
+			vi.advanceTimersByTime(DAILY_SUMMARY_INTERVAL_MS);
+
+			expect(debugLines().length).toBeGreaterThan(0);
+			for (const line of debugLines()) {
+				expect(line).not.toContain("Secret-Client-X");
+			}
+			scheduler.stop();
+		});
+
+		it("tick lines contain only rule name, direction, dry-run tag and counts or error message", async () => {
+			setDebugSource(() => true);
+			const rule = makeImportRule({
+				name: "Rule-A",
+				sourcePath: "/very/private/source" as ImportRule["sourcePath"],
+				destinationVaultPath: "private-dest" as ImportRule["destinationVaultPath"],
+			});
+			const importRunner = makeImportRunner();
+			const { scheduler } = buildScheduler({ plugin, rules: [rule], importRunner });
+
+			await scheduler.runOnce(rule.id, { dryRun: false });
+			expect(tickLines()).toEqual([
+				"[Hakobi/Scheduler] tick begin: Rule-A (import)",
+				"[Hakobi/Scheduler] tick end: Rule-A — ok (0 copied, 0 skipped, 0 failed)",
+			]);
+			for (const line of debugLines()) {
+				expect(line).not.toContain("/very/private/source");
+				expect(line).not.toContain("private-dest");
+			}
+		});
+
+		it("emits exactly one summary per 24 h and two per 48 h", async () => {
+			const { scheduler } = buildScheduler({ plugin, rules: [] });
+			await scheduler.start();
+
+			vi.advanceTimersByTime(DAILY_SUMMARY_INTERVAL_MS);
+			expect(summaryLines()).toHaveLength(1);
+			vi.advanceTimersByTime(DAILY_SUMMARY_INTERVAL_MS);
+			expect(summaryLines()).toHaveLength(2);
+			scheduler.stop();
+		});
+
+		it("writes the summary line with zeros when there were no runs", async () => {
+			const { scheduler } = buildScheduler({ plugin, rules: [] });
+			await scheduler.start();
+
+			vi.advanceTimersByTime(DAILY_SUMMARY_INTERVAL_MS);
+
+			expect(summaryLines()).toEqual([
+				"[Hakobi] daily summary: 0 completed, 0 failed, 0 overlap skips, 0 dry runs; files 0 copied, 0 skipped, 0 failed",
+			]);
+			scheduler.stop();
+		});
+
+		it("writes no summary after stop()", async () => {
+			const { scheduler } = buildScheduler({ plugin, rules: [] });
+			await scheduler.start();
+			scheduler.stop();
+
+			vi.advanceTimersByTime(3 * DAILY_SUMMARY_INTERVAL_MS);
+
+			expect(summaryLines()).toHaveLength(0);
+		});
+
+		it("starts the next summary from zero after stop() then start()", async () => {
+			const rule = makeImportRule({ everyMinutes: 60 * 48 });
+			const { scheduler } = buildScheduler({ plugin, rules: [rule] });
+			await scheduler.start();
+			await scheduler.runOnce(rule.id, { dryRun: false });
+			scheduler.stop();
+			await scheduler.start();
+
+			vi.advanceTimersByTime(DAILY_SUMMARY_INTERVAL_MS);
+
+			expect(summaryLines()).toHaveLength(1);
+			expect(summaryLines()[0]).toContain("0 completed");
+			scheduler.stop();
+		});
+
+		it("calling start() twice keeps a single summary timer", async () => {
+			const { scheduler } = buildScheduler({ plugin, rules: [] });
+			await scheduler.start();
+			await scheduler.start();
+
+			vi.advanceTimersByTime(DAILY_SUMMARY_INTERVAL_MS);
+
+			expect(summaryLines()).toHaveLength(1);
+			scheduler.stop();
+		});
+
+		it("registers the summary interval with the plugin", async () => {
+			const { scheduler } = buildScheduler({ plugin, rules: [] });
+			await scheduler.start();
+
+			expect(plugin.registerInterval).toHaveBeenCalledTimes(1);
+			scheduler.stop();
 		});
 	});
 });

@@ -16,6 +16,11 @@ import type { AuditEntry } from "../audit/AuditEntry";
 import type { Direction } from "../audit/AuditEntry";
 import type { RunStats } from "../runner/RunStats";
 import { InFlightRegistry } from "./InFlightRegistry";
+import {
+	ActivityTotals,
+	DAILY_SUMMARY_INTERVAL_MS,
+	formatDailySummary,
+} from "./ActivityTotals";
 import { log } from "../util/logger";
 
 // ---------------------------------------------------------------------------
@@ -66,6 +71,8 @@ export interface SchedulerDeps {
 	auditLog: SchedulerAuditLog;
 	inFlight: InFlightRegistry;
 	nowFn?: () => Date;
+	/** Run-outcome counters behind the daily summary. Defaults to a fresh instance. */
+	activityTotals?: ActivityTotals;
 }
 
 // ---------------------------------------------------------------------------
@@ -82,6 +89,10 @@ export class Scheduler {
 	private readonly auditLog: SchedulerAuditLog;
 	private readonly inFlight: InFlightRegistry;
 	private readonly nowFn: () => Date;
+	private readonly activityTotals: ActivityTotals;
+
+	/** Cancels the daily-summary interval; undefined while not started. */
+	private cancelSummary: (() => void) | undefined;
 
 	/** Map from RuleId to a cancel function that calls clearInterval(id). */
 	private readonly cancelMap: Map<RuleId, () => void> = new Map();
@@ -96,6 +107,7 @@ export class Scheduler {
 		this.auditLog = deps.auditLog;
 		this.inFlight = deps.inFlight;
 		this.nowFn = deps.nowFn ?? (() => new Date());
+		this.activityTotals = deps.activityTotals ?? new ActivityTotals();
 	}
 
 	// -------------------------------------------------------------------------
@@ -113,7 +125,8 @@ export class Scheduler {
 				enabledCount += 1;
 			}
 		}
-		log.debug(
+		this.scheduleSummary();
+		log.lifecycle(
 			`[Hakobi] config loaded: ${rules.length} rules (${enabledCount} enabled on this device)`,
 		);
 	}
@@ -139,13 +152,13 @@ export class Scheduler {
 			const enabled = await this.deviceStore.isEnabled(rule.id);
 			if (enabled) enabledRules.push(rule);
 		}
-		log.debug(
+		log.lifecycle(
 			`[Hakobi/Scheduler] initial run starting (${enabledRules.length} enabled rules)`,
 		);
 		for (const rule of enabledRules) {
 			await this.executeTick(rule, false);
 		}
-		log.debug("[Hakobi/Scheduler] initial run finished");
+		log.lifecycle("[Hakobi/Scheduler] initial run finished");
 	}
 
 	// -------------------------------------------------------------------------
@@ -157,6 +170,9 @@ export class Scheduler {
 			cancel();
 		}
 		this.cancelMap.clear();
+		this.cancelSummaryTimer();
+		// Drop the counts so a later start() begins a fresh period.
+		this.activityTotals.takeSnapshot();
 	}
 
 	// -------------------------------------------------------------------------
@@ -249,6 +265,21 @@ export class Scheduler {
 		this.cancelMap.set(rule.id, () => window.clearInterval(rawId));
 	}
 
+	/** Schedule the once-a-day summary line. Replaces any existing summary timer. */
+	private scheduleSummary(): void {
+		this.cancelSummaryTimer();
+		const rawId = window.setInterval(() => {
+			log.lifecycle(formatDailySummary(this.activityTotals.takeSnapshot()));
+		}, DAILY_SUMMARY_INTERVAL_MS);
+		this.plugin.registerInterval(rawId);
+		this.cancelSummary = () => window.clearInterval(rawId);
+	}
+
+	private cancelSummaryTimer(): void {
+		this.cancelSummary?.();
+		this.cancelSummary = undefined;
+	}
+
 	/** Cancel and remove the timer for a rule if one exists. */
 	private cancelTimer(ruleId: RuleId): void {
 		const cancel = this.cancelMap.get(ruleId);
@@ -265,6 +296,7 @@ export class Scheduler {
 		const acquired = this.inFlight.tryAcquire(rule.id);
 
 		if (!acquired) {
+			this.activityTotals.recordOverlap();
 			log.debug(
 				`[Hakobi/Scheduler] tick skip: ${rule.name} (${rule.direction}) — overlap`,
 			);
@@ -289,11 +321,13 @@ export class Scheduler {
 
 		try {
 			const stats = await this.dispatchRunner(rule, dryRun);
+			this.activityTotals.recordReturned(stats, dryRun);
 			this.statusBar.setIdle();
 			log.debug(
 				`[Hakobi/Scheduler] tick end: ${rule.name} — ok (${stats.copied} copied, ${stats.skipped} skipped, ${stats.failed} failed)`,
 			);
 		} catch (err: unknown) {
+			this.activityTotals.recordFailed();
 			const summary = err instanceof Error ? err.message : "unknown error";
 			log.warn(
 				`[Hakobi/Scheduler] tick end: ${rule.name} — failed: ${summary}`,
