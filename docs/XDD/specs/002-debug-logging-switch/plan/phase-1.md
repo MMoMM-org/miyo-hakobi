@@ -1,6 +1,6 @@
 ---
 title: "Phase 1: Foundations"
-status: pending
+status: completed
 version: "1.0"
 phase: 1
 ---
@@ -34,7 +34,7 @@ phase: 1
 
 This phase establishes the three building blocks that the wiring in Phase 2 consumes: a gated logger, a pure activity counter, and the persisted switch.
 
-- [ ] **T1.1 Gated logger with lifecycle channel** `[activity: backend-api]` `[parallel: true]`
+- [x] **T1.1 Gated logger with lifecycle channel** `[activity: backend-api]` `[parallel: true]`
 
   1. Prime: Read `src/util/logger.ts` and the gated-logger example `[ref: SDD/Implementation Examples/Example: Gated logger]`.
   2. Test (`test/util/logger.test.ts`, NEW):
@@ -51,7 +51,7 @@ This phase establishes the three building blocks that the wiring in Phase 2 cons
      - The switch state controls `log.debug` with no reload. `[ref: PRD/AC-1.2, AC-1.3]`
      - Each channel uses the console level specified in the SDD. `[ref: PRD/AC-2.6]`
 
-- [ ] **T1.2 ActivityTotals counter and summary formatter** `[activity: domain-modeling]` `[parallel: true]`
+- [x] **T1.2 ActivityTotals counter and summary formatter** `[activity: domain-modeling]` `[parallel: true]`
 
   1. Prime: Read `src/runner/RunStats.ts`, the traced walkthrough `[ref: SDD/Implementation Examples/Example: Traced walkthrough]`, and the PRD business rules 2–8 `[ref: PRD/Detailed Feature Specifications]`.
   2. Test (`test/scheduler/ActivityTotals.test.ts`, NEW):
@@ -71,7 +71,7 @@ This phase establishes the three building blocks that the wiring in Phase 2 cons
      - The counting rules match the PRD business rules 2–5. `[ref: PRD/AC-3.2, AC-3.3, AC-3.5]` `[ref: SDD/ADR-6]`
      - The summary contains counts only. `[ref: PRD/AC-3.6, AC-4.1]`
 
-- [ ] **T1.3 Persisted debugLogging setting** `[activity: data-architecture]` `[parallel: true]`
+- [x] **T1.3 Persisted debugLogging setting** `[activity: data-architecture]` `[parallel: true]`
 
   1. Prime: Read `src/types/index.ts:53-58`, `src/persistence/RuleStore.ts:51-56,279-298` and `src/main.ts:59-64` `[ref: SDD/Data Storage Changes]` `[ref: SDD/Technical Debt]`.
   2. Test:
@@ -92,7 +92,7 @@ This phase establishes the three building blocks that the wiring in Phase 2 cons
      - It is stored in `data.json` `globalSettings`. `[ref: PRD/AC-1.5]`
      - Missing or invalid values default to off. `[ref: PRD/AC-1.1]`
 
-- [ ] **T1.4 Runner abort flag on RunStats** `[activity: backend-api]` `[parallel: true]`
+- [x] **T1.4 Runner abort flag on RunStats** `[activity: backend-api]` `[parallel: true]`
 
   1. Prime: Read `src/runner/RunStats.ts`, `src/runner/ImportRunner.ts:136-161` and the early-return paths in `src/runner/ExportRunner.ts:119-156` `[ref: SDD/Architecture Decisions/ADR-6]` `[ref: SDD/Internal API Changes]`.
   2. Test:
@@ -104,6 +104,6 @@ This phase establishes the three building blocks that the wiring in Phase 2 cons
   4. Validate: runner tests green; full `npm test`; `npm run build`.
   5. Success: Aborted runs are distinguishable from completed runs. `[ref: PRD/AC-3.2]` `[ref: PRD/Detailed Feature Specifications/Business Rules/Rule 3]`
 
-- [ ] **T1.5 Phase Validation** `[activity: validate]`
+- [x] **T1.5 Phase Validation** `[activity: validate]`
 
   - Run all Phase 1 tests. Verify them against the SDD interfaces and PRD business rules. `npm test`, `npm run lint` and `npm run build` pass.
