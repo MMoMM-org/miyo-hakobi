@@ -71,3 +71,15 @@ upper-case drive letter, trim trailing `/`).
 
 **Rule:** scope checks compare *comparable* spellings on both sides — never a
 raw `realpath()` / `getBasePath()` string against a stored rule path.
+
+## Scope guard silently disabled by a vault-relative pluginDir (#20)
+
+`main.ts` passed `manifest.dir` (`.obsidian/plugins/<id>`, vault-relative) as
+`pluginDir` to the scope validators; `isForbiddenVaultPath` needs it absolute,
+so only the vault root was refused and rules into/out of `.obsidian/` passed.
+scope.test.ts never noticed because its fixture is absolute. Fix: pass
+`vaultIo.resolveVaultPath(pluginDataDir)`; `test/main.scope-wiring.test.ts`
+captures what main.ts actually wires and asserts the guard fires.
+
+**Rule:** pure-domain tests prove the guard; a wiring test must prove main.ts
+feeds it the shape it expects. DeviceStore keeps the vault-relative value.

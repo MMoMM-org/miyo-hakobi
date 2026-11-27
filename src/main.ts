@@ -98,6 +98,11 @@ export default class HakobiPlugin extends Plugin {
       return `${vaultRoot}/${pluginDataDir}/${rel}`;
     };
     const auditDir = resolvePluginPath("audit");
+    // The scope guard (domain/scope.ts) refuses rules touching the config dir
+    // and the plugin data dir only when it gets an ABSOLUTE plugin dir on the
+    // same base as vaultRoot — handing it the vault-relative pluginDataDir made
+    // it match nothing but the vault root (#20).
+    const pluginDirAbs = vaultIo.resolveVaultPath(pluginDataDir);
 
     // ------------------------------------------------------------------
     // 4. AuditLog + Rotation
@@ -155,9 +160,9 @@ export default class HakobiPlugin extends Plugin {
       nodeFs,
       vaultIo,
       validateScope: (rule: ImportRule, fs, vault) =>
-        validateRuleAtRunTime(rule, fs, vault, vaultRoot, pluginDataDir),
+        validateRuleAtRunTime(rule, fs, vault, vaultRoot, pluginDirAbs),
       vaultRoot,
-      pluginDir: pluginDataDir,
+      pluginDir: pluginDirAbs,
       nowFn: () => new Date(),
       globalSettings: {
         stabilityCheckMs: () => this.globalSettings.stabilityCheckMs,
@@ -180,7 +185,7 @@ export default class HakobiPlugin extends Plugin {
             resolveVaultPath: (p: string) => vaultIo.resolveVaultPath(p),
           },
           vaultRoot,
-          pluginDataDir,
+          pluginDirAbs,
         ),
       nowFn: () => new Date(),
     });
@@ -348,7 +353,7 @@ export default class HakobiPlugin extends Plugin {
       ruleStore,
       deviceStore,
       vaultRoot,
-      pluginDir: pluginDataDir,
+      pluginDir: pluginDirAbs,
       chooseFsFolder,
       chooseVaultFolder,
     });
@@ -357,7 +362,7 @@ export default class HakobiPlugin extends Plugin {
       ruleStore,
       deviceStore,
       vaultRoot,
-      pluginDir: pluginDataDir,
+      pluginDir: pluginDirAbs,
       chooseFsFolder,
       chooseVaultFolder,
     });
