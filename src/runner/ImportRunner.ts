@@ -375,7 +375,7 @@ export class ImportRunner {
             sourcePathRelative: relPath,
             errorCode: "disk-full",
           });
-          return outcomesToStats(outcomes);
+          return { ...outcomesToStats(outcomes), aborted: true };
         }
         await auditLog.append({
           ...base(),
@@ -461,7 +461,7 @@ export class ImportRunner {
             destinationPathRelative: finalDestSubpath,
             errorCode: "disk-full",
           });
-          return outcomesToStats(outcomes);
+          return { ...outcomesToStats(outcomes), aborted: true };
         }
         await auditLog.append({
           ...base(),

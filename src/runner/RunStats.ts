@@ -22,9 +22,10 @@ export interface RunStats {
   skipped: number;
   /** Files that failed (per-file rejected / error). */
   failed: number;
-  /** True when the runner gave up before processing any file (scope refusal,
-   *  source not found, export source/destination unusable). A run whose files
-   *  all fail per-file is NOT aborted. */
+  /** True when the runner gave up before finishing: before any file (scope
+   *  refusal, source not found, export source/destination unusable) or
+   *  mid-run on import disk-full. A run whose files all fail per-file is NOT
+   *  aborted. */
   aborted: boolean;
 }
 

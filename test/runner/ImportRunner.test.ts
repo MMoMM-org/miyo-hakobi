@@ -646,6 +646,53 @@ describe("ImportRunner", () => {
     expect(okEntries).toHaveLength(0);
   });
 
+  it("disk-full on source read mid-run → aborted run, earlier counts kept, audit unchanged", async () => {
+    const fileMtime = NOW_MS - 5000;
+    fakeFs.addDir("/src", ["a.md", "b.md"]);
+    fakeFs.addFile("/src/a.md", "aaa", fileMtime);
+    fakeFs.addFile("/src/b.md", "bbb", fileMtime);
+    fakeFs.readFileErrors.set(
+      "/src/b.md",
+      new IoUnknownError("readFile", "/src/b.md", new Error("ENOSPC"), "disk-full"),
+    );
+
+    const runner = buildRunner({ fakeFs, fakeVault, auditLog });
+    const stats = await runner.run(makeRule());
+
+    expect(stats).toEqual({ copied: 1, skipped: 0, failed: 0, aborted: true });
+    const ruleEntry = auditLog.entries[auditLog.entries.length - 1];
+    expect(ruleEntry.decision).toBe("rule-failed");
+    expect(ruleEntry.errorCode).toBe("disk-full");
+    expect(ruleEntry.sourcePathRelative).toBe("b.md");
+  });
+
+  it("disk-full on vault write mid-run → aborted run, earlier counts kept, audit unchanged", async () => {
+    const fileMtime = NOW_MS - 5000;
+    fakeFs.addDir("/src", ["a.md", "b.md"]);
+    fakeFs.addFile("/src/a.md", "aaa", fileMtime);
+    fakeFs.addFile("/src/b.md", "bbb", fileMtime);
+
+    const vault = new FakeVault();
+    let calls = 0;
+    const realWrite = vault.writeBinary.bind(vault);
+    vi.spyOn(vault, "writeBinary").mockImplementation(async (path, bytes) => {
+      calls++;
+      if (calls === 2) {
+        throw new IoUnknownError("writeBinary", path, new Error("ENOSPC"), "disk-full");
+      }
+      await realWrite(path, bytes);
+    });
+
+    const runner = buildRunner({ fakeFs, fakeVault: vault, auditLog });
+    const stats = await runner.run(makeRule());
+
+    expect(stats).toEqual({ copied: 1, skipped: 0, failed: 0, aborted: true });
+    const ruleEntry = auditLog.entries[auditLog.entries.length - 1];
+    expect(ruleEntry.decision).toBe("rule-failed");
+    expect(ruleEntry.errorCode).toBe("disk-full");
+    expect(ruleEntry.sourcePathRelative).toBe("b.md");
+  });
+
   // -------------------------------------------------------------------------
   // 15. mtime NOT preserved on import (ADR-6)
   // -------------------------------------------------------------------------

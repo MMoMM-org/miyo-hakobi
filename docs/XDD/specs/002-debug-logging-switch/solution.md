@@ -365,8 +365,9 @@ Module: src/util/logger.ts
   log.error(...args): void       # unchanged — always console.error
 
 Module: src/runner/RunStats.ts
-  RunStats.aborted: boolean   # NEW — true when the runner gave up before processing files
-                              # (scope refusal, source not found, export source unreadable)
+  RunStats.aborted: boolean   # NEW — true when the runner gave up before finishing: before any file
+                              # (scope refusal, source not found, export source/destination unusable)
+                              # or mid-run on import disk-full
 
 Module: src/scheduler/ActivityTotals.ts (NEW)
   class ActivityTotals
@@ -741,13 +742,14 @@ Not applicable. Only one component is involved.
   - Trade-offs: readers of spec 001 must follow a pointer.
   - User confirmed: 2026-11-27
 
-- [x] ADR-6 Aborted runs count as failed: `RunStats` gains `aborted: boolean`, set by the runners' early-return paths (scope refusal, source not found, export source unreadable). `ActivityTotals` counts a returned run with `aborted: true` as `failedRuns`.
+- [x] ADR-6 Aborted runs count as failed: `RunStats` gains `aborted: boolean`, set by the runners' early-return paths (scope refusal, source not found, export source unreadable) and by the import disk-full stop. `ActivityTotals` counts a returned run with `aborted: true` as `failedRuns`.
   - Rationale:
     - These failures write `rule-failed` to the audit log but return normally, so without a signal the summary would report "0 failed" while a rule fails every run (the #15 Windows bug was exactly this shape).
     - Keying on an explicit abort flag rather than on `rule-failed` avoids the import quirk where an all-skipped run is recorded as `rule-failed`.
   - Trade-offs:
     - The runner return type changes (one field); every `RunStats` literal and test fixture needs `aborted`.
     - A run where every file fails per-file is not "aborted"; it counts as completed with files failed.
+  - Extended 2026-11-27 after the Phase 1 drift check: import disk-full mid-run also aborts, so Rule 3's 'unexpected failure' is counted.
   - User confirmed: 2026-11-27
 
 ## Quality Requirements
