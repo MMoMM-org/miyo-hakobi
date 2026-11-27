@@ -79,7 +79,7 @@ async function loadPluginWithRule(): Promise<TestPlugin> {
   return plugin;
 }
 
-function lines(spy: { mock: { calls: unknown[][] } }): string[] {
+function debugLines(spy: { mock: { calls: unknown[][] } }): string[] {
   return spy.mock.calls.map((c) => c.map(String).join(" "));
 }
 
@@ -118,7 +118,7 @@ describe("debug logging switch and daily summary, end to end (#18)", () => {
     await vi.advanceTimersByTimeAsync(INTERVAL_MS);
     expect(runSpy).toHaveBeenCalledTimes(2); // one timer run
 
-    const all = lines(debugSpy);
+    const all = debugLines(debugSpy);
     expect(tickLines(all)).toEqual([]);
     expect(all.some((l) => l.includes("plugin loading (9.9.9)"))).toBe(true);
     expect(all.some((l) => l.includes("config loaded: 1 rules (1 enabled on this device)"))).toBe(true);
@@ -128,7 +128,7 @@ describe("debug logging switch and daily summary, end to end (#18)", () => {
   it("toggling on through the General save wrapper makes the next run write tick lines", async () => {
     plugin = await loadPluginWithRule();
     await vi.advanceTimersByTimeAsync(GRACE_MS + INTERVAL_MS);
-    expect(tickLines(lines(debugSpy))).toEqual([]);
+    expect(tickLines(debugLines(debugSpy))).toEqual([]);
 
     const deps = captured["GeneralSubtab"] as unknown as {
       ruleStore: {
@@ -141,7 +141,7 @@ describe("debug logging switch and daily summary, end to end (#18)", () => {
 
     debugSpy.mockClear();
     await vi.advanceTimersByTimeAsync(INTERVAL_MS);
-    const ticks = tickLines(lines(debugSpy));
+    const ticks = tickLines(debugLines(debugSpy));
     expect(ticks.some((l) => l.includes("tick begin"))).toBe(true);
     expect(ticks.some((l) => l.includes("tick end") && l.includes("1 copied"))).toBe(true);
   });
@@ -151,7 +151,7 @@ describe("debug logging switch and daily summary, end to end (#18)", () => {
     await vi.advanceTimersByTimeAsync(GRACE_MS + INTERVAL_MS);
     await vi.advanceTimersByTimeAsync(DAILY_SUMMARY_INTERVAL_MS - GRACE_MS - INTERVAL_MS);
 
-    const summaries = lines(debugSpy).filter((l) => SUMMARY_RE.test(l));
+    const summaries = debugLines(debugSpy).filter((l) => SUMMARY_RE.test(l));
     const n = runSpy.mock.calls.length;
     expect(n).toBe(1 + Math.floor(DAILY_SUMMARY_INTERVAL_MS / INTERVAL_MS)); // initial + timer runs
     expect(summaries).toEqual([
@@ -160,21 +160,40 @@ describe("debug logging switch and daily summary, end to end (#18)", () => {
     expect(summaries[0]).not.toContain(RULE_NAME);
   });
 
-  it("onunload then _runCleanup leaves no timers and log.debug silent", async () => {
+  it("onunload then _runCleanup clears every interval the plugin registered and log.debug stays silent", async () => {
+    const clearSpy = vi.spyOn(window, "clearInterval");
     plugin = await loadPluginWithRule();
-    (plugin as unknown as { globalSettings: GlobalSettings }).globalSettings.debugLogging = true;
+    const deps = captured["GeneralSubtab"] as unknown as {
+      ruleStore: {
+        loadGlobalSettings: () => Promise<GlobalSettings>;
+        saveGlobalSettings: (s: GlobalSettings) => Promise<void>;
+      };
+    };
+    await deps.ruleStore.saveGlobalSettings({
+      ...(await deps.ruleStore.loadGlobalSettings()),
+      debugLogging: true,
+    });
     await vi.advanceTimersByTimeAsync(GRACE_MS + 1);
-    expect(vi.getTimerCount()).toBeGreaterThan(0); // rule timer + summary timer
+
+    // Scoped to this plugin: its registered intervals (rule timer + summary
+    // timer). The global fake-timer count is not used because a fire-and-forget
+    // audit rotation briefly holds a NodeFs timeout timer of its own.
+    const registered = (plugin.registerInterval as unknown as { mock: { calls: number[][] } })
+      .mock.calls.map((c) => c[0]);
+    expect(registered).toHaveLength(2);
 
     plugin.onunload();
     unloaded = true;
     plugin._runCleanup();
-    expect(vi.getTimerCount()).toBe(0);
+    const cleared = clearSpy.mock.calls.map((c) => c[0]);
+    for (const id of registered) expect(cleared).toContain(id);
 
     debugSpy.mockClear();
+    runSpy.mockClear();
     log.debug("after-unload");
     await vi.advanceTimersByTimeAsync(DAILY_SUMMARY_INTERVAL_MS);
-    expect(lines(debugSpy)).toEqual([]);
-    expect(runSpy).toHaveBeenCalledTimes(1);
+    expect(runSpy).not.toHaveBeenCalled();
+    expect(debugLines(debugSpy)).toEqual([]);
+    clearSpy.mockRestore();
   });
 });
