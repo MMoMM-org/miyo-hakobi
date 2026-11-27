@@ -145,7 +145,7 @@ Each phase is defined in a separate file. Tasks follow red-green-refactor: **Pri
 
 - [x] [Phase 1: Foundations](phase-1.md)
 - [x] [Phase 2: Wiring and settings UI](phase-2.md)
-- [ ] [Phase 3: Documentation and end-to-end validation](phase-3.md)
+- [x] [Phase 3: Documentation and end-to-end validation](phase-3.md)
 
 ---
 

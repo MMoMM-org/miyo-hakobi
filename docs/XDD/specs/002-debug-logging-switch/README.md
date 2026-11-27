@@ -5,7 +5,7 @@
 | Field | Value |
 |-------|-------|
 | **Created** | 2026-11-27 |
-| **Current Phase** | Ready |
+| **Current Phase** | Implemented |
 | **Decomposition tier** | Incremental |
 | **Model tier** | hard |
 | **Last Updated** | 2026-11-27 |
@@ -42,6 +42,7 @@
 | 2026-11-27 | ADR-6: aborted runs count as failed via `RunStats.aborted` | User chose to count non-throwing rule failures (scope refusal, missing source) as failed runs; keyed on an abort flag, not on `rule-failed`, to avoid the import all-skipped quirk |
 | 2026-11-27 | ADR-6 extended: mid-run disk-full on import also sets `aborted: true` | Phase 1 drift check found the disk-full returns (ImportRunner) reported a completed run with 0 failed, contradicting PRD Rule 3 intent. User chose to count it as a failed run |
 | 2026-11-27 | Plan complete: 3 phases, 12 tasks | Phase 1 foundations (logger, ActivityTotals, setting, runner abort flag), Phase 2 wiring + UI, Phase 3 docs + e2e |
+| 2026-11-27 | Implementation complete | All 3 phases done; 893 tests green, lint and build clean. Final AC validation: no FAIL; Edge 2/5 covered by construction + Scheduler-level tests only |
 
 ## Context
 
