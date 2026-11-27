@@ -196,4 +196,37 @@ describe("debug logging switch and daily summary, end to end (#18)", () => {
     expect(debugLines(debugSpy)).toEqual([]);
     clearSpy.mockRestore();
   });
+
+  it("treats disable then re-enable as a new load: counts and the 24 h clock restart", async () => {
+    plugin = await loadPluginWithRule();
+    await vi.advanceTimersByTimeAsync(GRACE_MS + INTERVAL_MS); // first instance: 2 runs
+    expect(runSpy).toHaveBeenCalledTimes(2);
+
+    // Part-way through the period, the user disables the plugin.
+    await vi.advanceTimersByTimeAsync(10 * 60 * 60_000);
+    plugin.onunload();
+    plugin._runCleanup();
+    unloaded = true;
+    debugSpy.mockClear();
+    runSpy.mockClear();
+
+    // Re-enable: a fresh instance whose 24 h clock starts now.
+    plugin = await loadPluginWithRule();
+    unloaded = false;
+    await vi.advanceTimersByTimeAsync(GRACE_MS + INTERVAL_MS); // second instance: 2 runs
+    expect(runSpy).toHaveBeenCalledTimes(2);
+
+    // The first instance's 24 h mark falls 14 h from now and must stay silent.
+    await vi.advanceTimersByTimeAsync(14 * 60 * 60_000);
+    expect(debugLines(debugSpy).filter((l) => SUMMARY_RE.test(l))).toEqual([]);
+
+    // Exactly 24 h after the second load, the one summary counts only its runs.
+    const elapsed = GRACE_MS + INTERVAL_MS + 14 * 60 * 60_000;
+    await vi.advanceTimersByTimeAsync(DAILY_SUMMARY_INTERVAL_MS - elapsed);
+    const n = runSpy.mock.calls.length;
+    expect(n).toBe(1 + Math.floor(DAILY_SUMMARY_INTERVAL_MS / INTERVAL_MS));
+    expect(debugLines(debugSpy).filter((l) => SUMMARY_RE.test(l))).toEqual([
+      `[Hakobi] daily summary: ${n} completed, 0 failed, 0 overlap skips, 0 dry runs; files ${n} copied, 0 skipped, 0 failed`,
+    ]);
+  });
 });

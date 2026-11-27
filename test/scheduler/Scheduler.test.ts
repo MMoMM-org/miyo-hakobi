@@ -1262,6 +1262,37 @@ describe("Scheduler", () => {
 			scheduler.stop();
 		});
 
+		it("keeps counts across rule edits, additions and removals so the summary covers all runs", async () => {
+			const ruleA = makeImportRule({ everyMinutes: 60 * 48 });
+			const ruleB = makeImportRule({ everyMinutes: 60 * 48 });
+			const rules: ImportRule[] = [ruleA];
+			const enabledIds = new Set<RuleId>([ruleA.id]);
+			const importRunner = makeImportRunner();
+			importRunner.run.mockResolvedValue({ copied: 2, skipped: 0, failed: 0, aborted: false });
+			const { scheduler } = buildScheduler({ plugin, rules, enabledIds, importRunner });
+			await scheduler.start();
+
+			await scheduler.runOnce(ruleA.id, { dryRun: false });
+			await scheduler.onRuleChanged({ ...ruleA, everyMinutes: 60 * 72 });
+			await scheduler.runOnce(ruleA.id, { dryRun: false });
+
+			rules.push(ruleB);
+			enabledIds.add(ruleB.id);
+			await scheduler.onRuleChanged(ruleB);
+			await scheduler.runOnce(ruleB.id, { dryRun: false });
+
+			scheduler.onRuleRemoved(ruleA.id);
+			rules.splice(0, 1);
+			scheduler.onRuleRemoved(ruleB.id);
+
+			vi.advanceTimersByTime(DAILY_SUMMARY_INTERVAL_MS);
+
+			expect(summaryLines()).toHaveLength(1);
+			expect(summaryLines()[0]).toContain("3 completed");
+			expect(summaryLines()[0]).toContain("files 6 copied");
+			scheduler.stop();
+		});
+
 		it("registers the summary interval with the plugin", async () => {
 			const { scheduler } = buildScheduler({ plugin, rules: [] });
 			await scheduler.start();
