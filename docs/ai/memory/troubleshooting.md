@@ -57,3 +57,15 @@ no `view`, so Obsidian cannot derive the anchor element or owning document and
 drops the menu at the viewport edge (Sept 2026: the rule overflow menu appeared
 left of the settings window). Use `menu.showAtPosition({ x, y }, doc)` with the
 anchor's `getBoundingClientRect()` and `ownerDocument` instead.
+
+## Scope guard silently disabled by a vault-relative pluginDir (#20)
+
+`main.ts` passed `manifest.dir` (`.obsidian/plugins/<id>`, vault-relative) as
+`pluginDir` to the scope validators; `isForbiddenVaultPath` needs it absolute,
+so only the vault root was refused and rules into/out of `.obsidian/` passed.
+scope.test.ts never noticed because its fixture is absolute. Fix: pass
+`vaultIo.resolveVaultPath(pluginDataDir)`; `test/main.scope-wiring.test.ts`
+captures what main.ts actually wires and asserts the guard fires.
+
+**Rule:** pure-domain tests prove the guard; a wiring test must prove main.ts
+feeds it the shape it expects. DeviceStore keeps the vault-relative value.
