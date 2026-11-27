@@ -27,20 +27,28 @@ vi.mock("../src/settings/subtabs/GeneralSubtab", async (orig) => {
   };
 });
 
-type Plugin_ = InstanceType<typeof import("../src/main").default> & Plugin;
+type TestPlugin = InstanceType<typeof import("../src/main").default> & Plugin;
 
-async function loadPlugin(): Promise<Plugin_> {
+async function loadPlugin(persistedDebugLogging?: boolean): Promise<TestPlugin> {
   const { default: HakobiPlugin } = await import("../src/main");
   const app = new App();
   (app.vault.adapter as unknown as Record<string, unknown>)["getFullPath"] = vi.fn(
     (rel: string) => `/vault/${rel}`,
   );
-  const plugin = new HakobiPlugin(app, { id: "miyo-hakobi" } as never) as Plugin_;
+  const plugin = new HakobiPlugin(app, { id: "miyo-hakobi" } as never) as TestPlugin;
   Object.assign(plugin.manifest, {
     id: "miyo-hakobi",
     version: "9.9.9",
     dir: ".obsidian/plugins/miyo-hakobi",
   });
+  if (persistedDebugLogging !== undefined) {
+    const data = {
+      schemaVersion: 1,
+      rules: [],
+      globalSettings: { debugLogging: persistedDebugLogging },
+    };
+    plugin.loadData = vi.fn(async () => data);
+  }
   await plugin.onload();
   return plugin;
 }
@@ -51,7 +59,8 @@ function debugLines(spy: { mock: { calls: unknown[][] } }): string[] {
 
 describe("HakobiPlugin debug logging wiring (#18)", () => {
   let spy: ReturnType<typeof vi.spyOn>;
-  let plugin: Plugin_ | undefined;
+  let plugin: TestPlugin | undefined;
+  let unloaded = false;
 
   beforeEach(() => {
     delete captured["GeneralSubtab"];
@@ -59,7 +68,8 @@ describe("HakobiPlugin debug logging wiring (#18)", () => {
   });
 
   afterEach(() => {
-    plugin?.onunload();
+    if (!unloaded) plugin?.onunload();
+    unloaded = false;
     plugin?._runCleanup();
     plugin = undefined;
     setDebugSource(null);
@@ -71,6 +81,20 @@ describe("HakobiPlugin debug logging wiring (#18)", () => {
     spy.mockClear();
     log.debug("probe-off");
     expect(debugLines(spy)).not.toContain("probe-off");
+  });
+
+  it("persisted debugLogging true is read through the load path", async () => {
+    plugin = await loadPlugin(true);
+    spy.mockClear();
+    log.debug("persisted-on");
+    expect(debugLines(spy)).toContain("persisted-on");
+  });
+
+  it("persisted debugLogging false stays silent through the load path", async () => {
+    plugin = await loadPlugin(false);
+    spy.mockClear();
+    log.debug("persisted-off");
+    expect(debugLines(spy)).not.toContain("persisted-off");
   });
 
   it("log.debug writes after onload when debugLogging is true", async () => {
@@ -116,6 +140,7 @@ describe("HakobiPlugin debug logging wiring (#18)", () => {
     plugin = await loadPlugin();
     spy.mockClear();
     plugin.onunload();
+    unloaded = true;
     expect(debugLines(spy).some((l) => l.includes("plugin unloading"))).toBe(true);
   });
 
@@ -123,6 +148,7 @@ describe("HakobiPlugin debug logging wiring (#18)", () => {
     plugin = await loadPlugin();
     (plugin as unknown as { globalSettings: GlobalSettings }).globalSettings.debugLogging = true;
     plugin.onunload();
+    unloaded = true;
     spy.mockClear();
     log.debug("after-unload");
     expect(debugLines(spy)).not.toContain("after-unload");
