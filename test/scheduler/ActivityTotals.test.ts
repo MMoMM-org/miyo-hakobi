@@ -76,9 +76,15 @@ describe("ActivityTotals", () => {
 
 	it("takeSnapshot returns a copy unaffected by later recording", () => {
 		const totals = new ActivityTotals();
-		const snap = totals.takeSnapshot();
 		totals.recordOverlap();
-		expect(snap).toEqual(ZERO);
+		totals.recordReturned(stats(2, 1, 0), false);
+		const snap = totals.takeSnapshot();
+		const expected = { ...ZERO, overlapSkips: 1, completedRuns: 1, filesCopied: 2, filesSkipped: 1 };
+
+		totals.recordOverlap();
+		totals.recordReturned(stats(4, 4, 4), false);
+
+		expect(snap).toEqual(expected);
 	});
 
 	it("replays the SDD walkthrough steps 1-7", () => {
