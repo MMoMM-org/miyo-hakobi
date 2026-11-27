@@ -288,7 +288,8 @@ describe("Scheduler", () => {
 			expect(calls.length).toBe(2);
 			// The ID passed must be coerced to a number (may be NaN in Node env
 			// where Timeout objects don't coerce to a sensible numeric ID — but
-			// the important invariant is that registerInterval is called once per rule).
+			// the important invariant is that registerInterval is called once per rule
+			// plus once for the daily-summary timer).
 			expect(calls[0]).toBeDefined();
 		});
 
@@ -942,16 +943,41 @@ describe("Scheduler", () => {
 
 		it("writes no tick lines with the source off (timer, initial run, runOnce, runAll)", async () => {
 			const rule = makeImportRule({ everyMinutes: 1 });
-			const { scheduler } = buildScheduler({ plugin, rules: [rule] });
+			const importRunner = makeImportRunner();
+			const { scheduler } = buildScheduler({ plugin, rules: [rule], importRunner });
 
 			await scheduler.start();
 			vi.advanceTimersByTime(60_000);
 			await flush();
+			expect(importRunner.run).toHaveBeenCalledTimes(1);
 			await scheduler.runInitialRun();
+			expect(importRunner.run).toHaveBeenCalledTimes(2);
 			await scheduler.runOnce(rule.id, { dryRun: false });
+			expect(importRunner.run).toHaveBeenCalledTimes(3);
 			await scheduler.runAll("import", { dryRun: true });
+			expect(importRunner.run).toHaveBeenCalledTimes(4);
 
 			expect(tickLines()).toEqual([]);
+			scheduler.stop();
+		});
+
+		it("writes tick lines for the timer, initial run, runOnce and runAll paths with the source on", async () => {
+			setDebugSource(() => true);
+			const rule = makeImportRule({ everyMinutes: 1 });
+			const { scheduler } = buildScheduler({ plugin, rules: [rule] });
+			const begins = (): number => tickLines().filter((l) => l.includes("tick begin")).length;
+
+			await scheduler.start();
+			vi.advanceTimersByTime(60_000);
+			await flush();
+			expect(begins()).toBe(1);
+			await scheduler.runInitialRun();
+			expect(begins()).toBe(2);
+			await scheduler.runOnce(rule.id, { dryRun: false });
+			expect(begins()).toBe(3);
+			await scheduler.runAll("import", { dryRun: true });
+			expect(begins()).toBe(4);
+			expect(tickLines().filter((l) => l.includes("tick end"))).toHaveLength(4);
 			scheduler.stop();
 		});
 
@@ -1148,6 +1174,7 @@ describe("Scheduler", () => {
 			await scheduler.runOnce(rule.id, { dryRun: false });
 			vi.advanceTimersByTime(DAILY_SUMMARY_INTERVAL_MS);
 
+			expect(summaryLines()).toHaveLength(1);
 			expect(debugLines().length).toBeGreaterThan(0);
 			for (const line of debugLines()) {
 				expect(line).not.toContain("Secret-Client-X");
