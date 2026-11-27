@@ -12,12 +12,13 @@ For installation, see [Installation](installation.md). For ready-made rule recip
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| Per-file IO timeout (ms) | `10000` | Applies to every per-file read/write across all rules. Increase for slow paths (NAS, large cloud-sync placeholders). |
+| Per-file IO timeout (seconds) | `10` | Applies to every per-file read/write across all rules. Increase for slow paths (NAS, large cloud-sync placeholders). |
 | Audit retention (days) | `90` | NDJSON files older than this are pruned at the next rotation check. |
-| Audit max size (MB) | `10` | Per-file cap. Once exceeded, the file rotates and a new monthly file starts. |
-| Stability check window (ms) | `2000` | How long an import-source file's `mtime` must stay unchanged before Hakobi picks it up. Prevents picking up half-written files. |
+| Max log size (MB) | `10` | Per-file cap. Once exceeded, the file rotates and a new monthly file starts. |
+| Stability-check window (seconds) | `2` | How long an import-source file's `mtime` must stay unchanged before Hakobi picks it up. Prevents picking up half-written files. |
 | **Show audit log** button | — | Opens the **current month's** `YYYY-MM.ndjson` file in your OS default app for `.ndjson`. There is no in-tab viewer. |
 | **Purge audit log now** button | — | Deletes every NDJSON file under the audit directory. Requires explicit confirmation in a dialog; writes a single post-purge marker entry to a fresh log. |
+| Debug logging (under **Developer**) | Off | Writes per-run detail to the developer console. Needs the console's **Verbose** level. Load events, the daily summary and errors are always written. See [Debug Logging](debug-logging.md). |
 
 ## Import subtab
 

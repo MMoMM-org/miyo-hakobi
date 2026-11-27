@@ -1,6 +1,6 @@
 # Privacy Policy — MiYo Hakobi
 
-_Last updated: 2026-05-01._
+_Last updated: 2026-11-27._
 
 ## TL;DR
 
@@ -72,6 +72,24 @@ Audit log entries are constrained to a closed allowlist of fields. The plugin wi
 - Any field outside the allowlist above. The writer enforces this at the type level (closed `AuditEntry` discriminated union); any attempt to add a field is a build-time error, not a runtime check.
 
 This addresses Constitution **L2 Privacy & Security**: "Audit logs and operation traces produced by MiYo components must record metadata only — never note content, frontmatter values, file bytes, or credentials."
+
+## Developer console
+
+Hakobi writes to Obsidian's developer console. Nothing in it leaves your machine, and it is not stored by Hakobi. What it writes depends on the **Debug logging** switch (Settings → General → Developer, off by default). See [Debug Logging](docs/debug-logging.md) for examples.
+
+| State | Lines | Contains |
+|---|---|---|
+| Always | Load and unload lines (plugin loading with version, config loaded with rule counts, initial run, plugin loaded, plugin unloading) and a daily summary of run counts | No rule names, file names or paths. Counts only. |
+| Always | Warnings and errors | The failing rule's name and the underlying error message, verbatim. Error messages can contain filesystem paths. |
+| Debug logging on | Per-run lines (tick begin, end, overlap skip) | Rule names, direction and result counts. Never note content, frontmatter values or file contents. |
+
+Load lines and the daily summary are written at the console's debug level, so they are hidden unless you enable **Verbose** in the developer tools. Warnings and errors are visible without it.
+
+The daily summary is kept in memory only, is reset on reload or disable, and is not written to the audit log. The audit log stays the only record of file activity.
+
+The switch itself is stored in `data.json`, so Obsidian Sync replicates it like every other General setting.
+
+If you share a console screenshot or excerpt, check it first for rule names and for paths inside error messages.
 
 ## Symlinks
 
