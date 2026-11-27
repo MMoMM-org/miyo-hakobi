@@ -1065,7 +1065,7 @@ stateDiagram-v2
   - Domain errors are typed (`ErrorCode`); never raw exception strings in audit.
   - Per-file errors are isolated; runs are partial-success-tolerant.
   - Rule-level fatal errors stop iteration but never crash the plugin.
-  - Console errors only on `errorCode: unknown` (catch-all bug indicators).
+  - Console errors only on `errorCode: unknown` (catch-all bug indicators). _Superseded by spec 002 (ADR-5): the console now also carries load lines, a daily summary and, with Debug logging on, per-run lines._
 - **Performance:**
   - Vault I/O via Vault API + metadata cache; never re-implement folder scans.
   - Audit-log viewer paginated (50 entries); never load all NDJSON files.
@@ -1073,7 +1073,7 @@ stateDiagram-v2
 - **i18n / L10n:** v0.1 ships English-only. All UI strings live in a single `src/ui/strings.ts` module to ease later localization.
 - **Logging / Auditing:**
   - Audit log is the single source of truth for what Hakobi did.
-  - `console.error` for unexpected exceptions (never for normal denials, refusals, or skips).
+  - `console.error` for unexpected exceptions (never for normal denials, refusals, or skips). _Superseded by spec 002 (ADR-5) as above; see `docs/debug-logging.md`._
   - No remote logging; no telemetry.
 
 ### Multi-Component Patterns

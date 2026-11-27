@@ -48,6 +48,7 @@ If you want voice memos, capture-app exports, or Hazel-bait folders to land in y
 | [How It Works](docs/how-it-works.md) | Vault owners + contributors | Architecture, scheduler, audit log, lifecycle |
 | [Commands](docs/commands.md) | Vault owners | The six command-palette entries and what they do |
 | [Audit Log](docs/audit-log.md) | Vault owners | Format, retention, allowlist, NDJSON inspection examples |
+| [Debug Logging](docs/debug-logging.md) | Vault owners | The Debug logging switch, console "Verbose" level, and the daily summary |
 | [Per-device Enablement](docs/per-device.md) | Vault owners | Why your synced rule didn't run; cross-device coordination model |
 | [Troubleshooting / FAQ](docs/troubleshooting.md) | Vault owners | Common issues with concrete fixes |
 | [Development Guide](docs/development.md) | Contributors | Build, test, lint, branching, architecture rules |

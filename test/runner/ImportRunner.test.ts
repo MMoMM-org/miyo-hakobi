@@ -278,8 +278,9 @@ describe("ImportRunner", () => {
 
     const rule = makeRule({ flattenOnTarget: false });
     const runner = buildRunner({ fakeFs, fakeVault, auditLog });
-    await runner.run(rule);
+    const stats = await runner.run(rule);
 
+    expect(stats).toEqual({ copied: 1, skipped: 0, failed: 0, aborted: false });
     // Expect the file was written to the vault
     expect(fakeVault.writeBinaryCount).toBe(1);
 
@@ -477,8 +478,9 @@ describe("ImportRunner", () => {
 
     const rule = makeRule();
     const runner = buildRunner({ fakeFs, fakeVault, auditLog, scopeResult });
-    await runner.run(rule);
+    const stats = await runner.run(rule);
 
+    expect(stats).toEqual({ copied: 0, skipped: 0, failed: 0, aborted: true });
     // Only one entry: rule-failed
     expect(auditLog.entries).toHaveLength(1);
     const failEntry = auditLog.entries[0];
@@ -600,8 +602,9 @@ describe("ImportRunner", () => {
     // /src dir does NOT exist in fakeFs — readdir will throw IoNotFoundError
     const rule = makeRule();
     const runner = buildRunner({ fakeFs, fakeVault, auditLog });
-    await runner.run(rule);
+    const stats = await runner.run(rule);
 
+    expect(stats).toEqual({ copied: 0, skipped: 0, failed: 0, aborted: true });
     expect(auditLog.entries).toHaveLength(1);
     expect(auditLog.entries[0].decision).toBe("rule-failed");
     expect(auditLog.entries[0].errorCode).toBe("source-not-found");
@@ -641,6 +644,53 @@ describe("ImportRunner", () => {
     // b.md should NOT have been attempted
     const okEntries = auditLog.entries.filter((e) => e.decision === "ok");
     expect(okEntries).toHaveLength(0);
+  });
+
+  it("disk-full on source read mid-run → aborted run, earlier counts kept, audit unchanged", async () => {
+    const fileMtime = NOW_MS - 5000;
+    fakeFs.addDir("/src", ["a.md", "b.md"]);
+    fakeFs.addFile("/src/a.md", "aaa", fileMtime);
+    fakeFs.addFile("/src/b.md", "bbb", fileMtime);
+    fakeFs.readFileErrors.set(
+      "/src/b.md",
+      new IoUnknownError("readFile", "/src/b.md", new Error("ENOSPC"), "disk-full"),
+    );
+
+    const runner = buildRunner({ fakeFs, fakeVault, auditLog });
+    const stats = await runner.run(makeRule());
+
+    expect(stats).toEqual({ copied: 1, skipped: 0, failed: 0, aborted: true });
+    const ruleEntry = auditLog.entries[auditLog.entries.length - 1];
+    expect(ruleEntry.decision).toBe("rule-failed");
+    expect(ruleEntry.errorCode).toBe("disk-full");
+    expect(ruleEntry.sourcePathRelative).toBe("b.md");
+  });
+
+  it("disk-full on vault write mid-run → aborted run, earlier counts kept, audit unchanged", async () => {
+    const fileMtime = NOW_MS - 5000;
+    fakeFs.addDir("/src", ["a.md", "b.md"]);
+    fakeFs.addFile("/src/a.md", "aaa", fileMtime);
+    fakeFs.addFile("/src/b.md", "bbb", fileMtime);
+
+    const vault = new FakeVault();
+    let calls = 0;
+    const realWrite = vault.writeBinary.bind(vault);
+    vi.spyOn(vault, "writeBinary").mockImplementation(async (path, bytes) => {
+      calls++;
+      if (calls === 2) {
+        throw new IoUnknownError("writeBinary", path, new Error("ENOSPC"), "disk-full");
+      }
+      await realWrite(path, bytes);
+    });
+
+    const runner = buildRunner({ fakeFs, fakeVault: vault, auditLog });
+    const stats = await runner.run(makeRule());
+
+    expect(stats).toEqual({ copied: 1, skipped: 0, failed: 0, aborted: true });
+    const ruleEntry = auditLog.entries[auditLog.entries.length - 1];
+    expect(ruleEntry.decision).toBe("rule-failed");
+    expect(ruleEntry.errorCode).toBe("disk-full");
+    expect(ruleEntry.sourcePathRelative).toBe("b.md");
   });
 
   // -------------------------------------------------------------------------
@@ -736,8 +786,10 @@ describe("ImportRunner", () => {
 
     const rule = makeRule();
     const runner = buildRunner({ fakeFs, fakeVault, auditLog, stabilityCheckMs: 2000 });
-    await runner.run(rule);
+    const stats = await runner.run(rule);
 
+    // All-skipped run is a completed run, not an abort (spec 002 ADR-6)
+    expect(stats).toEqual({ copied: 0, skipped: 1, failed: 0, aborted: false });
     const ruleEntry = auditLog.entries[auditLog.entries.length - 1];
     // skipped-only entries → rule-failed (no ok)
     expect(ruleEntry.decision).toBe("rule-failed");

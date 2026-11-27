@@ -748,7 +748,7 @@ describe("ExportRunner — RunStats return value", () => {
 
     const stats = await runner.run(makeFolderRule({ onCollision: "skip" }));
 
-    expect(stats).toEqual({ copied: 3, skipped: 0, failed: 0 });
+    expect(stats).toEqual({ copied: 3, skipped: 0, failed: 0, aborted: false });
   });
 
   it("returns skipped=N when collisions cause skip-on-collision skips", async () => {
@@ -802,6 +802,83 @@ describe("ExportRunner — RunStats return value", () => {
 
     const stats = await runner.run(makeFolderRule());
 
-    expect(stats).toEqual({ copied: 0, skipped: 0, failed: 0 });
+    expect(stats).toEqual({ copied: 0, skipped: 0, failed: 0, aborted: true });
+  });
+
+  it("flags aborted when the note source is missing", async () => {
+    const vault = makeVaultStub({ fileByPath: () => null });
+    const { runner } = makeRunner({ vault });
+
+    const stats = await runner.run(makeNoteRule());
+
+    expect(stats).toEqual({ copied: 0, skipped: 0, failed: 0, aborted: true });
+  });
+
+  it("flags aborted when the note vanishes between pre-check and enumeration", async () => {
+    const file = createMockTFile({ path: "Notes/MyNote.md", name: "MyNote.md" });
+    const fileByPath = vi.fn<(path: string) => TFile | null>();
+    fileByPath.mockReturnValueOnce(file).mockReturnValue(null);
+    const vault = makeVaultStub({ fileByPath });
+    const audit = makeAuditStub();
+    const { runner } = makeRunner({ vault, audit });
+
+    const stats = await runner.run(makeNoteRule());
+
+    expect(stats).toEqual({ copied: 0, skipped: 0, failed: 0, aborted: true });
+    expect(audit._entries).toHaveLength(1);
+    expect(audit._entries[0].decision).toBe("rule-failed");
+    expect(audit._entries[0].errorCode).toBe("source-not-found");
+    expect(vault.readBinary).not.toHaveBeenCalled();
+  });
+
+  it("flags aborted when the destination parent is missing", async () => {
+    const fs = makeFsStub({
+      lstat: async () => {
+        throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
+      },
+    });
+    const { runner } = makeRunner({ fs });
+
+    const stats = await runner.run(makeFolderRule());
+
+    expect(stats.aborted).toBe(true);
+  });
+
+  it("flags aborted when the destination directory cannot be created", async () => {
+    const fs = makeFsStub({
+      mkdir: async () => {
+        throw new Error("EACCES");
+      },
+    });
+    const { runner } = makeRunner({ fs });
+
+    const stats = await runner.run(makeFolderRule());
+
+    expect(stats.aborted).toBe(true);
+  });
+
+  it("does not flag aborted when every file fails per-file", async () => {
+    const file = createMockTFile({ path: "Notes/a.md", name: "a.md" });
+    const vault = makeVaultStub({
+      listFolder: async () => [file],
+      readBinary: async () => {
+        throw new Error("read failed");
+      },
+    });
+    const { runner } = makeRunner({ vault });
+
+    const stats = await runner.run(makeFolderRule());
+
+    expect(stats.failed).toBe(1);
+    expect(stats.aborted).toBe(false);
+  });
+
+  it("does not flag aborted for an empty (nothing to export) run", async () => {
+    const vault = makeVaultStub({ listFolder: async () => [] });
+    const { runner } = makeRunner({ vault });
+
+    const stats = await runner.run(makeFolderRule());
+
+    expect(stats).toEqual({ copied: 0, skipped: 0, failed: 0, aborted: false });
   });
 });

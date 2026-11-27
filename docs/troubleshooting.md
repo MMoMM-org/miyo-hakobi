@@ -82,7 +82,7 @@ Settings changes take effect immediately for the **next** tick — they are not 
 The status bar item only appears once Hakobi's `onload` has completed. If Obsidian is in the middle of starting up, you may not see it for a second or two. If it stays missing for longer than ~10 seconds:
 
 1. Toggle the plugin off and on in Settings → Community Plugins.
-2. Open the Developer Console (`Cmd/Ctrl + Shift + I` on desktop) and look for `[Hakobi]` log lines or red errors.
+2. Open the developer console (`Cmd+Option+I` on macOS, `Ctrl+Shift+I` on Windows and Linux), enable the **Verbose** level in the **Default levels** dropdown, and look for `[Hakobi]` log lines or red errors. Load lines are written at the debug level, so they stay hidden without **Verbose**. For per-run detail, also turn on **Debug logging** in the General subtab. See [Debug Logging](debug-logging.md).
 3. If you see a stack trace, [open an issue](https://github.com/MMoMM-org/miyo-hakobi/issues) with the trace.
 
 ## Where do I report bugs?
@@ -93,6 +93,7 @@ The status bar item only appears once Hakobi's `onload` has completed. If Obsidi
 - Hakobi version (manifest.json or the header in the settings tab)
 - OS + version
 - A short reproduction (the failing rule's settings, what you expected, what happened)
+- A debug log excerpt: turn on **Debug logging**, reproduce the problem, and copy the `[Hakobi]` lines from the console. See [Debug Logging](debug-logging.md). Check it for rule names and paths first.
 - Relevant audit-log entries (use the `Show audit log` button — paste plain text, the log is metadata-only by design)
 
 ## Where do I report a security issue?

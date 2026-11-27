@@ -36,6 +36,7 @@ function makeDefaultSettings(): GlobalSettings {
 		auditRetentionDays: 90,
 		auditMaxBytes: 10485760,
 		stabilityCheckMs: 2000,
+		debugLogging: false,
 	};
 }
 
@@ -425,6 +426,7 @@ describe("RuleStore.loadGlobalSettings()", () => {
 			auditRetentionDays: 7,
 			auditMaxBytes: 512,
 			stabilityCheckMs: 100,
+			debugLogging: false,
 		};
 		const adapter = makeFakeAdapter({
 			schemaVersion: 1,
@@ -453,6 +455,7 @@ describe("RuleStore.saveGlobalSettings()", () => {
 			auditRetentionDays: 14,
 			auditMaxBytes: 2097152,
 			stabilityCheckMs: 1000,
+			debugLogging: false,
 		};
 		await store.saveGlobalSettings(newSettings);
 
@@ -473,6 +476,7 @@ describe("RuleStore.saveGlobalSettings()", () => {
 			auditRetentionDays: 30,
 			auditMaxBytes: 1048576,
 			stabilityCheckMs: 500,
+			debugLogging: false,
 		};
 		const adapter = makeFakeAdapter({
 			schemaVersion: 1,
@@ -493,6 +497,7 @@ describe("RuleStore.saveGlobalSettings()", () => {
 			auditRetentionDays: 60,
 			auditMaxBytes: 2097152,
 			stabilityCheckMs: 1000,
+			debugLogging: false,
 		};
 		await store.saveGlobalSettings(newSettings);
 
@@ -508,6 +513,74 @@ describe("RuleStore.saveGlobalSettings()", () => {
 
 		// And the new settings must be applied.
 		expect(persisted.globalSettings).toEqual(newSettings);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// debugLogging setting (spec 002, T1.3)
+// ---------------------------------------------------------------------------
+describe("RuleStore debugLogging setting (spec 002, T1.3)", () => {
+	it("loads as false when debugLogging is missing from data.json", async () => {
+		const adapter = makeFakeAdapter({
+			schemaVersion: 1,
+			rules: [],
+			globalSettings: {
+				perFileTimeoutMs: 1000,
+				auditRetentionDays: 7,
+				auditMaxBytes: 512,
+				stabilityCheckMs: 100,
+			},
+		});
+		const store = new RuleStore(adapter);
+		const settings = await store.loadGlobalSettings();
+		expect(settings.debugLogging).toBe(false);
+	});
+
+	it.each([
+		["a string", "yes"],
+		["a number", 1],
+	])("loads as false when debugLogging is %s", async (_label, value) => {
+		const adapter = makeFakeAdapter({
+			schemaVersion: 1,
+			rules: [],
+			globalSettings: { ...makeDefaultSettings(), debugLogging: value },
+		});
+		const store = new RuleStore(adapter);
+		const settings = await store.loadGlobalSettings();
+		expect(settings.debugLogging).toBe(false);
+	});
+
+	it("round-trips true through saveGlobalSettings and loadGlobalSettings", async () => {
+		const adapter = makeFakeAdapter({ schemaVersion: 1, rules: [], globalSettings: makeDefaultSettings() });
+		const store = new RuleStore(adapter);
+		await store.saveGlobalSettings({ ...makeDefaultSettings(), debugLogging: true });
+
+		const reloaded = new RuleStore(adapter);
+		const settings = await reloaded.loadGlobalSettings();
+		expect(settings.debugLogging).toBe(true);
+	});
+
+	it("writes debugLogging into data.json globalSettings", async () => {
+		const adapter = makeFakeAdapter({ schemaVersion: 1, rules: [], globalSettings: makeDefaultSettings() });
+		const store = new RuleStore(adapter);
+		await store.saveGlobalSettings({ ...makeDefaultSettings(), debugLogging: true });
+
+		const saved = adapter._getStored() as { globalSettings: Record<string, unknown> };
+		expect(saved.globalSettings.debugLogging).toBe(true);
+	});
+
+	it("leaves the other four settings fields unaffected by debugLogging", async () => {
+		const custom = {
+			perFileTimeoutMs: 1234,
+			auditRetentionDays: 7,
+			auditMaxBytes: 512,
+			stabilityCheckMs: 100,
+			debugLogging: true,
+		};
+		const adapter = makeFakeAdapter({ schemaVersion: 1, rules: [], globalSettings: custom });
+		const store = new RuleStore(adapter);
+		const settings = await store.loadGlobalSettings();
+		expect(settings).toEqual(custom);
 	});
 });
 

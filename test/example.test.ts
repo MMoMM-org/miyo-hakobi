@@ -16,6 +16,7 @@ describe("Plugin Settings", () => {
       auditRetentionDays: 90,
       auditMaxBytes: 10485760,
       stabilityCheckMs: 2000,
+      debugLogging: false,
     };
     expect(settings.perFileTimeoutMs).toBe(10000);
     expect(settings.auditRetentionDays).toBe(90);

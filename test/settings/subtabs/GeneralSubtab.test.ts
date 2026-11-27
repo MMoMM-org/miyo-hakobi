@@ -38,6 +38,7 @@ const SEED_SETTINGS: GlobalSettings = {
 	auditRetentionDays: 90,
 	auditMaxBytes: 10485760,
 	stabilityCheckMs: 2000,
+	debugLogging: false,
 };
 
 const AUDIT_PATH = "/audit/2026-05.ndjson";
@@ -386,5 +387,121 @@ describe("GeneralSubtab", () => {
 		expect(saveGlobalSettings).not.toHaveBeenCalled();
 		// The input must be reset to the previously loaded display value
 		expect(input!.value).toBe(displayValue);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Developer section — Debug logging toggle (spec 002, T2.3)
+// ---------------------------------------------------------------------------
+
+const DEBUG_DESC =
+	"Write per-run details to the developer console (off by default). Requires the developer tools Verbose log level. Load events and a daily summary are always written at that level; errors always show.";
+
+function settingRows(containerEl: HTMLElement): HTMLElement[] {
+	return Array.from(containerEl.querySelectorAll<HTMLElement>("[data-setting-name]"));
+}
+
+function findDebugToggle(containerEl: HTMLElement): HTMLElement | null {
+	return containerEl.querySelector<HTMLElement>('[data-field="debugLogging"]');
+}
+
+describe("GeneralSubtab Developer section (spec 002, T2.3)", () => {
+	let containerEl: HTMLElement;
+
+	beforeEach(() => {
+		containerEl = makeContainer();
+	});
+
+	it("renders a Developer heading after the Audit log heading", async () => {
+		const subtab = new GeneralSubtab(makeDeps());
+		subtab.render(containerEl);
+		await flushMicrotasks();
+
+		const headings = settingRows(containerEl)
+			.filter((row) => row.classList.contains("setting-heading"))
+			.map((row) => row.getAttribute("data-setting-name"));
+		expect(headings).toContain("Developer");
+		expect(headings.indexOf("Developer")).toBeGreaterThan(headings.indexOf("Audit log"));
+		expect(headings.at(-1)).toBe("Developer");
+	});
+
+	it("renders the Debug logging toggle under Developer, off by default", async () => {
+		const subtab = new GeneralSubtab(makeDeps());
+		subtab.render(containerEl);
+		await flushMicrotasks();
+
+		const toggle = findDebugToggle(containerEl);
+		expect(toggle).not.toBeNull();
+		expect(toggle?.getAttribute("aria-checked")).toBe("false");
+		const row = settingRows(containerEl).find((r) => r.getAttribute("data-setting-name") === "Debug logging");
+		expect(row).toBeDefined();
+		expect(row?.contains(toggle as HTMLElement)).toBe(true);
+	});
+
+	it("reflects a stored debugLogging value of true", async () => {
+		const deps = makeDeps({
+			loadGlobalSettings: vi.fn(async () => ({ ...SEED_SETTINGS, debugLogging: true })),
+		});
+		const subtab = new GeneralSubtab(deps);
+		subtab.render(containerEl);
+		await flushMicrotasks();
+
+		expect(findDebugToggle(containerEl)?.getAttribute("aria-checked")).toBe("true");
+	});
+
+	it("shows the exact SDD description copy", async () => {
+		const subtab = new GeneralSubtab(makeDeps());
+		subtab.render(containerEl);
+		await flushMicrotasks();
+
+		const row = settingRows(containerEl).find((r) => r.getAttribute("data-setting-name") === "Debug logging");
+		expect(row).toBeDefined();
+		expect(row?.children[1]?.textContent).toBe(DEBUG_DESC);
+	});
+
+	it("flipping the toggle saves { ...current, debugLogging: true } and leaves other fields unchanged", async () => {
+		const saveGlobalSettings = vi.fn(async () => {});
+		const subtab = new GeneralSubtab(makeDeps({ saveGlobalSettings }));
+		subtab.render(containerEl);
+		await flushMicrotasks();
+
+		findDebugToggle(containerEl)!.click();
+		await flushMicrotasks();
+
+		expect(saveGlobalSettings).toHaveBeenCalledOnce();
+		expect(saveGlobalSettings).toHaveBeenCalledWith({ ...SEED_SETTINGS, debugLogging: true });
+	});
+
+	it("flipping the toggle back off saves debugLogging: false", async () => {
+		const saveGlobalSettings = vi.fn(async () => {});
+		const deps = makeDeps({
+			saveGlobalSettings,
+			loadGlobalSettings: vi.fn(async () => ({ ...SEED_SETTINGS, debugLogging: true })),
+		});
+		const subtab = new GeneralSubtab(deps);
+		subtab.render(containerEl);
+		await flushMicrotasks();
+
+		findDebugToggle(containerEl)!.click();
+		await flushMicrotasks();
+
+		expect(saveGlobalSettings).toHaveBeenCalledWith({ ...SEED_SETTINGS, debugLogging: false });
+	});
+
+	it("keeps numeric fields saving after a toggle flip (current snapshot stays in sync)", async () => {
+		const saveGlobalSettings = vi.fn(async () => {});
+		const subtab = new GeneralSubtab(makeDeps({ saveGlobalSettings }));
+		subtab.render(containerEl);
+		await flushMicrotasks();
+
+		findDebugToggle(containerEl)!.click();
+		await flushMicrotasks();
+
+		const input = findInputByLabel(containerEl, "retention");
+		input!.value = "30";
+		input!.dispatchEvent(new Event("input"));
+		await flushMicrotasks();
+
+		expect(saveGlobalSettings).toHaveBeenLastCalledWith({ ...SEED_SETTINGS, debugLogging: true, auditRetentionDays: 30 });
 	});
 });

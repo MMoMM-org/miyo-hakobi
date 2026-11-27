@@ -4,7 +4,8 @@
 // The runners have always emitted per-file decisions to the audit log, but
 // callers (Scheduler, in particular) had no way to know how a run went
 // without parsing the log back out. RunStats is a typed in-process summary:
-// just the three counts the user cares about. Used by Scheduler to surface
+// the three counts the user cares about plus an `aborted` flag for runs
+// that gave up before processing any file. Used by Scheduler to surface
 // "ok (3 copied, 1 skipped)" in the DevConsole tick-end log line.
 //
 // "copied" is the label users recognise even though Hakobi also supports
@@ -21,9 +22,14 @@ export interface RunStats {
   skipped: number;
   /** Files that failed (per-file rejected / error). */
   failed: number;
+  /** True when the runner gave up before finishing: before any file (scope
+   *  refusal, source not found, export source/destination unusable) or
+   *  mid-run on import disk-full. A run whose files all fail per-file is NOT
+   *  aborted. */
+  aborted: boolean;
 }
 
-export const EMPTY_STATS: RunStats = { copied: 0, skipped: 0, failed: 0 };
+export const EMPTY_STATS: RunStats = { copied: 0, skipped: 0, failed: 0, aborted: false };
 
 /** Tally a per-file decision into the stats bucket. Caller mutates `stats`. */
 export function tally(stats: RunStats, decision: Decision): void {

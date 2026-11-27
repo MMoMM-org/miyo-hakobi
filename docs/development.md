@@ -32,6 +32,8 @@ npm run test:watch   # vitest watch mode
 npm run test:coverage # vitest with v8 coverage
 ```
 
+`npm run test:coverage` — v8 coverage via `@vitest/coverage-v8` (dev-only, pinned to the vitest version).
+
 Tests use vitest + jsdom + a custom Obsidian mock at `test/__mocks__/obsidian.ts`. The mock fires real DOM events for `Setting`, `Toggle`, `Button`, and `Dropdown` so tests dispatch real clicks and inputs against `inputEl`, `toggleEl`, `buttonEl`, `selectEl`.
 
 Lifecycle cleanup is testable via the mock's `Plugin._runCleanup()` — simulates Obsidian invoking every `register*()` callback on unload. Asserting `_cleanupFns` is empty after `_runCleanup()` proves no listeners or intervals were left orphaned.

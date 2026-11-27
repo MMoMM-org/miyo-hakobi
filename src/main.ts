@@ -26,7 +26,7 @@ import { NodeFs } from "./fs/NodeFs";
 import { VaultIo } from "./vault/VaultIo";
 import { AuditLog } from "./audit/AuditLog";
 import { Rotation } from "./audit/Rotation";
-import { RuleStore } from "./persistence/RuleStore";
+import { RuleStore, DEFAULT_GLOBAL_SETTINGS } from "./persistence/RuleStore";
 import { DeviceStore } from "./persistence/DeviceStore";
 import { InFlightRegistry } from "./scheduler/InFlightRegistry";
 import { Scheduler } from "./scheduler/Scheduler";
@@ -45,7 +45,7 @@ import { HakobiSettingsTab } from "./settings/SettingsTab";
 import { ImportRuleEditor } from "./settings/editor/ImportRuleEditor";
 import { ExportRuleEditor } from "./settings/editor/ExportRuleEditor";
 import { validateRuleAtRunTime } from "./domain/scope";
-import { log } from "./util/logger";
+import { log, setDebugSource } from "./util/logger";
 
 import type { GlobalSettings } from "./types/index";
 import type { ImportRule } from "./domain/rule";
@@ -56,15 +56,12 @@ export default class HakobiPlugin extends Plugin {
   // Hold a reference to settingsTab so StatusBar.openSettings can deep-link.
   private settingsTab!: HakobiSettingsTab;
   // Hold globalSettings in memory after load; refreshed by saveGlobalSettings.
-  private globalSettings: GlobalSettings = {
-    perFileTimeoutMs: 10000,
-    auditRetentionDays: 90,
-    auditMaxBytes: 10485760,
-    stabilityCheckMs: 2000,
-  };
+  private globalSettings: GlobalSettings = { ...DEFAULT_GLOBAL_SETTINGS };
 
   async onload(): Promise<void> {
-    log.debug(`[Hakobi] plugin loading (${this.manifest.version})`);
+    // Live read: the General save wrapper updates this.globalSettings in memory.
+    setDebugSource(() => this.globalSettings.debugLogging);
+    log.lifecycle(`[Hakobi] plugin loading (${this.manifest.version})`);
 
     // ------------------------------------------------------------------
     // 1. NodeFs — timeout reads fresh from globalSettings on every call
@@ -501,11 +498,12 @@ export default class HakobiPlugin extends Plugin {
       retentionDays: this.globalSettings.auditRetentionDays,
     }).catch(() => undefined);
 
-    log.debug("[Hakobi] plugin loaded");
+    log.lifecycle("[Hakobi] plugin loaded");
   }
 
   onunload(): void {
-    log.debug("[Hakobi] plugin unloading");
+    log.lifecycle("[Hakobi] plugin unloading");
     this.scheduler?.stop();
+    setDebugSource(null);
   }
 }

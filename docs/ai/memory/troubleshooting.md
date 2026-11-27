@@ -83,3 +83,15 @@ captures what main.ts actually wires and asserts the guard fires.
 
 **Rule:** pure-domain tests prove the guard; a wiring test must prove main.ts
 feeds it the shape it expects. DeviceStore keeps the vault-relative value.
+
+## Flaky `vi.getTimerCount()` in plugin-level tests (#18)
+
+`onload` fires `rotation.checkAndRotate()` without awaiting; NodeFs
+`runWithTimeout` holds a `window.setTimeout` until its real fs call settles, so
+a global fake-timer count read right after unload is 1 in ~16% of runs. Not a
+leak (the `finally` clears it).
+
+**Rule:** in plugin-level tests assert on the plugin's own timers (ids recorded
+by the mock's `registerInterval` → passed to `clearInterval`), never on the
+global `vi.getTimerCount()`. Use `vi.advanceTimersByTimeAsync` for async runs;
+never `vi.runAllTimers*` with a real Scheduler.
