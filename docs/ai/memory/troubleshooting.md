@@ -58,6 +58,20 @@ drops the menu at the viewport edge (Sept 2026: the rule overflow menu appeared
 left of the settings window). Use `menu.showAtPosition({ x, y }, doc)` with the
 anchor's `getBoundingClientRect()` and `ownerDocument` instead.
 
+## Windows: every rule refused with `forbidden-path` (#15)
+
+`scope.ts` treated only `/…` as absolute, so drive paths (`D:/…`) failed the
+save-time shape check (`traversal` → audit `forbidden-path`). Behind it sat a
+second trap: `getBasePath()` and `realpath()` return backslashes (and sometimes
+a `\\?\` prefix) on Windows while rule paths are forward-slash canonical, so
+the realpath escape check refused every rule and the vault-loop guard would
+have silently stopped matching. Fix: `isAbsoluteFsPath` accepts drive letters;
+every scope comparison goes through `comparablePath` (strip `\\?\`, `\` → `/`,
+upper-case drive letter, trim trailing `/`).
+
+**Rule:** scope checks compare *comparable* spellings on both sides — never a
+raw `realpath()` / `getBasePath()` string against a stored rule path.
+
 ## Scope guard silently disabled by a vault-relative pluginDir (#20)
 
 `main.ts` passed `manifest.dir` (`.obsidian/plugins/<id>`, vault-relative) as

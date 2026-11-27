@@ -712,3 +712,148 @@ describe("validateRuleAtSave — defensive exhaustiveness", () => {
     expect(() => validateRuleAtSave(malformed, VAULT_ROOT, PLUGIN_DIR)).toThrow();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Windows paths (#15)
+//
+// On Windows, rule paths are canonicalized to forward slashes (rule.ts) while
+// `getBasePath()` and `realpath()` return backslashes, sometimes with a
+// `\\?\` extended-length prefix. Absolute-path detection must accept drive
+// letters, and every comparison must be separator-agnostic — otherwise every
+// rule is refused (escape) AND the vault-loop guard silently stops matching.
+// ---------------------------------------------------------------------------
+
+describe("scope — Windows paths (#15)", () => {
+  const WIN_VAULT = "C:\\Users\\me\\Vault";
+  const WIN_PLUGIN = "C:\\Users\\me\\Vault\\.obsidian\\plugins\\miyo-hakobi";
+  const winSource = "D:/FOREX/News - Trading Economics" as AbsolutePath;
+
+  it("accepts an ImportRule with a drive-letter sourcePath at save time", () => {
+    const r = validateRuleAtSave(importRule({ sourcePath: winSource }), WIN_VAULT, WIN_PLUGIN);
+    expect(r.ok).toBe(true);
+  });
+
+  it("accepts an ExportFolderRule with a drive-letter destinationPath at save time", () => {
+    const rule = exportFolderRule({ destinationPath: "E:/Backup/Projects" as AbsolutePath });
+    expect(validateRuleAtSave(rule, WIN_VAULT, WIN_PLUGIN).ok).toBe(true);
+  });
+
+  it("rejects a drive-letter sourcePath that contains `..`", () => {
+    const r = validateRuleAtSave(
+      importRule({ sourcePath: "D:/FOREX/../Windows" as AbsolutePath }),
+      WIN_VAULT,
+      WIN_PLUGIN,
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.errors.reason).toBe("traversal");
+  });
+
+  it("rejects a drive-letter path used as a vault-relative destination", () => {
+    const r = validateRuleAtSave(
+      importRule({ sourcePath: winSource, destinationVaultPath: "C:/Windows" as VaultRelativePath }),
+      WIN_VAULT,
+      WIN_PLUGIN,
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.errors.reason).toBe("traversal");
+  });
+
+  it("rejects an ImportRule whose forward-slash source lies inside a backslash vault root (vault-loop)", () => {
+    const r = validateRuleAtSave(
+      importRule({ sourcePath: "C:/Users/me/Vault/Inbox" as AbsolutePath }),
+      WIN_VAULT,
+      WIN_PLUGIN,
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.errors.reason).toBe("vault-loop");
+  });
+
+  it("rejects an ExportFolderRule whose destination is inside the vault with a lower-case drive letter", () => {
+    const rule = exportFolderRule({ destinationPath: "c:/Users/me/Vault/Out" as AbsolutePath });
+    const r = validateRuleAtSave(rule, WIN_VAULT, WIN_PLUGIN);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.errors.reason).toBe("vault-loop");
+  });
+
+  it("refuses the .obsidian dir under a backslash vault root", () => {
+    expect(isForbiddenVaultPath("C:/Users/me/Vault/.obsidian", WIN_VAULT, WIN_PLUGIN)).toBe(true);
+    expect(isForbiddenVaultPath("C:/Users/me/Vault/Notes", WIN_VAULT, WIN_PLUGIN)).toBe(false);
+  });
+
+  it("does not treat the vault root's drive as inside the vault", () => {
+    expect(isVaultPath("C:/", WIN_VAULT)).toBe(false);
+    expect(isInsideRoot("C:/Users", "C:/")).toBe(true);
+  });
+
+  it("accepts at run time when realpath returns the source root with backslashes", async () => {
+    const fs = makeFs({ realpaths: { [winSource]: "D:\\FOREX\\News - Trading Economics" } });
+    const r = await validateRuleAtRunTime(
+      importRule({ sourcePath: winSource }), fs, makeVaultIo(WIN_VAULT), WIN_VAULT, WIN_PLUGIN,
+    );
+    expect(r.ok).toBe(true);
+  });
+
+  it("accepts at run time when realpath returns an extended-length `\\\\?\\` prefix", async () => {
+    const fs = makeFs({ realpaths: { [winSource]: "\\\\?\\D:\\FOREX\\News - Trading Economics" } });
+    const r = await validateRuleAtRunTime(
+      importRule({ sourcePath: winSource }), fs, makeVaultIo(WIN_VAULT), WIN_VAULT, WIN_PLUGIN,
+    );
+    expect(r.ok).toBe(true);
+  });
+
+  it("accepts at run time when the declared drive letter is lower case", async () => {
+    const declared = "d:/FOREX/News" as AbsolutePath;
+    const fs = makeFs({ realpaths: { [declared]: "D:\\FOREX\\News" } });
+    const r = await validateRuleAtRunTime(
+      importRule({ sourcePath: declared }), fs, makeVaultIo(WIN_VAULT), WIN_VAULT, WIN_PLUGIN,
+    );
+    expect(r.ok).toBe(true);
+  });
+
+  it("still rejects at run time when a backslash realpath escapes the source root", async () => {
+    const fs = makeFs({ realpaths: { [winSource]: "C:\\Windows\\System32" } });
+    const r = await validateRuleAtRunTime(
+      importRule({ sourcePath: winSource }), fs, makeVaultIo(WIN_VAULT), WIN_VAULT, WIN_PLUGIN,
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.errors.reason).toBe("escape");
+  });
+
+  it("rejects at run time when an export destination's backslash realpath lands in the vault", async () => {
+    const dest = "E:/Linked" as AbsolutePath;
+    const fs = makeFs({ realpaths: { [dest]: "C:\\Users\\me\\Vault\\Linked" } });
+    const r = await validateRuleAtRunTime(
+      exportFolderRule({ destinationPath: dest }), fs, makeVaultIo(WIN_VAULT), WIN_VAULT, WIN_PLUGIN,
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.errors.reason).toBe("vault-loop");
+  });
+
+  it("accepts a child whose backslash realpath stays inside the source root and rejects one that escapes", async () => {
+    const inside = `${winSource}/a.txt`;
+    const outside = `${winSource}/b.txt`;
+    const fs = makeFs({
+      realpaths: {
+        [winSource]: "D:\\FOREX\\News - Trading Economics",
+        [inside]: "D:\\FOREX\\News - Trading Economics\\a.txt",
+        [outside]: "D:\\Elsewhere\\b.txt",
+      },
+    });
+    const vault = makeVaultIo(WIN_VAULT);
+    const rule = importRule({ sourcePath: winSource });
+    const ok = await validateRuleAtRunTime(rule, fs, vault, WIN_VAULT, WIN_PLUGIN, { children: [inside] });
+    expect(ok.ok).toBe(true);
+    const bad = await validateRuleAtRunTime(rule, fs, vault, WIN_VAULT, WIN_PLUGIN, { children: [outside] });
+    expect(bad.ok).toBe(false);
+    if (!bad.ok) expect(bad.errors.reason).toBe("escape");
+  });
+
+  it("rejects a drive-letter child name as absolute-in-filename", async () => {
+    const r = await validateRuleAtRunTime(
+      importRule({ sourcePath: winSource }), makeFs(), makeVaultIo(WIN_VAULT), WIN_VAULT, WIN_PLUGIN,
+      { childNames: ["C:\\Windows\\win.ini"] },
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.errors.reason).toBe("absolute-in-filename");
+  });
+});
