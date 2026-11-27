@@ -741,7 +741,7 @@ describe("ImportRunner", () => {
     const runner = buildRunner({ fakeFs, fakeVault, auditLog, stabilityCheckMs: 2000 });
     const stats = await runner.run(rule);
 
-    // All-skipped run is a completed run, not an abort (ADR-6)
+    // All-skipped run is a completed run, not an abort (spec 002 ADR-6)
     expect(stats).toEqual({ copied: 0, skipped: 1, failed: 0, aborted: false });
     const ruleEntry = auditLog.entries[auditLog.entries.length - 1];
     // skipped-only entries → rule-failed (no ok)

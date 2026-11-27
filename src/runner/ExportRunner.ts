@@ -43,7 +43,7 @@ import {
   writeFsBinaryAtomic,
 } from "./AtomicWriter";
 import { mapScopeViolationToErrorCode } from "./errorCodeMapping";
-import { type RunStats, tally } from "./RunStats";
+import { type RunStats, EMPTY_STATS, tally } from "./RunStats";
 
 // ---------------------------------------------------------------------------
 // Deps shape (constructor DI)
@@ -95,7 +95,7 @@ export class ExportRunner {
   async run(rule: ExportRule, opts?: { dryRun?: boolean }): Promise<RunStats> {
     const dryRun = opts?.dryRun ?? rule.dryRun;
     const ts = this.nowFn().toISOString();
-    const stats: RunStats = { copied: 0, skipped: 0, failed: 0, aborted: false };
+    const stats: RunStats = { ...EMPTY_STATS };
 
     // Step 0 (note rules only): existence pre-check.
     //

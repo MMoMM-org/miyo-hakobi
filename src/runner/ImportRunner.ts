@@ -542,7 +542,7 @@ export class ImportRunner {
 /** Tally per-file outcomes into a RunStats object. FileOutcome is a strict
  *  subset of Decision so the shared `tally` helper applies directly. */
 function outcomesToStats(outcomes: FileOutcome[]): RunStats {
-  const stats: RunStats = { copied: 0, skipped: 0, failed: 0, aborted: false };
+  const stats: RunStats = { ...EMPTY_STATS };
   for (const o of outcomes) tally(stats, o);
   return stats;
 }

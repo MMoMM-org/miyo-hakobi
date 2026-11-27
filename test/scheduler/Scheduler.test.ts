@@ -22,6 +22,7 @@ import { newRuleId } from "../../src/domain/ruleId";
 import type { RuleId } from "../../src/domain/ruleId";
 import type { ImportRule, ExportFolderRule } from "../../src/domain/rule";
 import type { AuditEntry } from "../../src/audit/AuditEntry";
+import type { RunStats } from "../../src/runner/RunStats";
 
 // ---------------------------------------------------------------------------
 // Factories
@@ -469,7 +470,7 @@ describe("Scheduler", () => {
 
 			// importRunner that never resolves (simulates long-running execution)
 			const neverResolving = vi.fn(
-				() => new Promise<{ copied: number; skipped: number; failed: number; aborted: boolean }>(() => {}),
+				() => new Promise<RunStats>(() => {}),
 			);
 			const importRunner = { run: neverResolving };
 

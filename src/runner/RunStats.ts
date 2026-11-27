@@ -4,7 +4,8 @@
 // The runners have always emitted per-file decisions to the audit log, but
 // callers (Scheduler, in particular) had no way to know how a run went
 // without parsing the log back out. RunStats is a typed in-process summary:
-// just the three counts the user cares about. Used by Scheduler to surface
+// the three counts the user cares about plus an `aborted` flag for runs
+// that gave up before processing any file. Used by Scheduler to surface
 // "ok (3 copied, 1 skipped)" in the DevConsole tick-end log line.
 //
 // "copied" is the label users recognise even though Hakobi also supports
