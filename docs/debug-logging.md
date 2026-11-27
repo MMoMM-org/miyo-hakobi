@@ -68,7 +68,7 @@ Everything above, plus one set of lines per run:
 A run that throws is always written as a warning, naming the rule and the underlying error message:
 
 ```
-[Hakobi/Scheduler] tick end: Voice memos — failed: ENOSPC: no space left on device
+[Hakobi/Scheduler] tick end: Voice memos — failed: Cannot read properties of undefined (reading 'path')
 ```
 
 The status bar kanji also turns to the error colour. Unexpected exceptions are written with `console.error`, for example `[Hakobi] initial run failed:` or `[Scheduler] Uncaught error in timer tick:`, followed by the error.
