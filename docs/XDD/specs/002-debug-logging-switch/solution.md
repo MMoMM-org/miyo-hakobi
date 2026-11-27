@@ -127,7 +127,11 @@ version: "1.0"
 
 - file: src/runner/RunStats.ts
   relevance: HIGH
-  why: "Per-run copied/skipped/failed counts, the input for the daily totals"
+  why: "Per-run copied/skipped/failed counts, the input for the daily totals; gains the `aborted` flag"
+
+- file: src/runner/ImportRunner.ts (L136-143 scope refusal, L153-161 source not found), src/runner/ExportRunner.ts (early-return paths L119-156)
+  relevance: HIGH
+  why: "Abort paths write rule-failed and return empty stats without throwing; they must set `aborted: true`"
 
 - file: src/types/index.ts (L53-58)
   relevance: HIGH
@@ -166,12 +170,13 @@ Not applicable. The feature has no external services. The only "external" surfac
   - `logger.ts` API, adding functions. Existing callers keep compiling.
   - `Scheduler` constructor deps, with an optional new dep.
   - The `GeneralSubtab` layout and the type of `_addNumericSetting`.
-  - The `main.ts` initial `globalSettings` literal, which may be replaced with `{ ...DEFAULT_GLOBAL_SETTINGS }` to remove a duplicated defaults block.
+  - The `main.ts` initial `globalSettings` literal, which is replaced with `{ ...DEFAULT_GLOBAL_SETTINGS }`. `DEFAULT_GLOBAL_SETTINGS` is not exported today (`RuleStore.ts:51`), so it becomes an export.
+  - `RunStats`, which gains `aborted: boolean`, and the runners' early-return (abort) paths, which set it. The per-file behaviour is unchanged.
   - The General table in `docs/configuration.md`, including its known ms-vs-seconds and label drift, since it is touched anyway.
 - **Must Not Touch**:
   - `src/audit/**`.
   - `src/domain/**` (scope logic).
-  - The runners' per-file behaviour.
+  - The runners' per-file behaviour and their audit entries.
   - `manifest.json` id.
   - `docs/audit-log.md`. Its "operation: summary" drift is out of scope, and a separate issue is proposed.
 
@@ -273,6 +278,7 @@ graph LR
 | F2 failures always (AC-2.4) | Existing `log.warn` / `log.error` call sites (unchanged) |
 | F2 console levels (AC-2.6) | Logger |
 | F3 counting rules (AC-3.2, 3.3, 3.5) | ActivityTotals |
+| F3 "aborted run" signal (AC-3.2, Rule 3) | Runners via `RunStats.aborted` |
 | F3 24 h cadence, zero summary, reload reset (AC-3.1, 3.4, 3.7) | Scheduler (summary interval) |
 | F3 / F4 no names in summary (AC-3.6, 4.1) | ActivityTotals (`formatDailySummary` takes counts only) |
 | F4 failure lines name the rule (AC-4.2), detail lines (AC-4.3) | Scheduler (existing call sites) |
@@ -286,22 +292,27 @@ graph LR
 ├── src/
 │   ├── util/
 │   │   └── logger.ts                 # MODIFY: debug gate (setDebugSource), new log.lifecycle
+│   ├── runner/
+│   │   ├── RunStats.ts               # MODIFY: add `aborted: boolean` (EMPTY_STATS keeps false)
+│   │   ├── ImportRunner.ts           # MODIFY: abort paths return `{ ...EMPTY_STATS, aborted: true }`
+│   │   └── ExportRunner.ts           # MODIFY: abort paths set `aborted: true`
 │   ├── scheduler/
 │   │   ├── ActivityTotals.ts         # NEW: pure in-memory counters + formatDailySummary
 │   │   └── Scheduler.ts              # MODIFY: record outcomes, 24 h summary interval, lifecycle lines
 │   ├── types/
 │   │   └── index.ts                  # MODIFY: GlobalSettings.debugLogging
 │   ├── persistence/
-│   │   └── RuleStore.ts              # MODIFY: default + boolean merge for debugLogging
+│   │   └── RuleStore.ts              # MODIFY: export DEFAULT_GLOBAL_SETTINGS; default + boolean merge for debugLogging
 │   ├── settings/subtabs/
 │   │   └── GeneralSubtab.ts          # MODIFY: Developer heading + toggle; numeric helper typed to numeric keys
 │   └── main.ts                       # MODIFY: register/clear debug source; lifecycle lines; defaults via DEFAULT_GLOBAL_SETTINGS
 ├── test/
 │   ├── util/logger.test.ts           # NEW
 │   ├── scheduler/ActivityTotals.test.ts  # NEW
+│   ├── runner/ImportRunner.test.ts, runner/ExportRunner.test.ts  # MODIFY: abort paths report aborted
 │   ├── scheduler/Scheduler.test.ts   # MODIFY: outcome recording, summary interval, quiet ticks
 │   ├── settings/subtabs/GeneralSubtab.test.ts  # MODIFY: toggle
-│   └── (RuleStore, types, example, spec/compliance, live helpers)  # MODIFY: GlobalSettings fixtures gain debugLogging
+│   └── (typed GlobalSettings fixtures)  # MODIFY: example.test.ts:14, types/index.test.ts:55,80, persistence/RuleStore.test.ts:33,423,451, settings/subtabs/GeneralSubtab.test.ts:36
 └── docs/
     ├── debug-logging.md              # NEW
     ├── troubleshooting.md            # MODIFY: Verbose + switch + per-OS shortcut
@@ -353,19 +364,23 @@ Module: src/util/logger.ts
   log.warn(...args): void        # unchanged — always console.warn
   log.error(...args): void       # unchanged — always console.error
 
+Module: src/runner/RunStats.ts
+  RunStats.aborted: boolean   # NEW — true when the runner gave up before processing files
+                              # (scope refusal, source not found, export source unreadable)
+
 Module: src/scheduler/ActivityTotals.ts (NEW)
   class ActivityTotals
-    recordCompleted(stats: RunStats, dryRun: boolean): void
-    recordFailed(): void
+    recordReturned(stats: RunStats, dryRun: boolean): void   # run returned stats (aborted or not)
+    recordFailed(): void                                      # runner threw
     recordOverlap(): void
     takeSnapshot(): ActivitySnapshot     # returns the current counts and resets them to zero
-  formatDailySummary(s: ActivitySnapshot): string
+  formatDailySummary(s: ActivitySnapshot): string   # full line including the "[Hakobi]" prefix
   DAILY_SUMMARY_INTERVAL_MS = 86_400_000
 
 Module: src/scheduler/Scheduler.ts
   SchedulerDeps.activityTotals?: ActivityTotals   # NEW optional dep; defaults to new ActivityTotals()
   start(): additionally schedules the summary interval (once)
-  stop(): additionally cancels the summary interval
+  stop(): additionally cancels the summary interval and discards the counts (takeSnapshot(), result dropped)
 ```
 
 #### Application Data Models
@@ -381,10 +396,10 @@ ENTITY: GlobalSettings (MODIFIED) — src/types/index.ts
 
 ENTITY: ActivitySnapshot (NEW) — src/scheduler/ActivityTotals.ts
   FIELDS:
-    completedRuns: number   # non-dry runs that returned RunStats
-    failedRuns: number      # runs whose runner threw (dry or not)
+    completedRuns: number   # non-dry runs that returned RunStats with aborted = false
+    failedRuns: number      # runs whose runner threw, or returned aborted = true (dry or not)
     overlapSkips: number    # ticks refused by the in-flight lock
-    dryRuns: number         # dry runs that returned RunStats
+    dryRuns: number         # dry runs that returned RunStats with aborted = false
     filesCopied: number     # sum of RunStats.copied over completedRuns
     filesSkipped: number    # sum of RunStats.skipped over completedRuns
     filesFailed: number     # sum of RunStats.failed over completedRuns
@@ -392,7 +407,10 @@ ENTITY: ActivitySnapshot (NEW) — src/scheduler/ActivityTotals.ts
 
 ENTITY: ActivityTotals (NEW)
   FIELDS: private current: ActivitySnapshot
-  BEHAVIORS: recordCompleted, recordFailed, recordOverlap, takeSnapshot (see above)
+  BEHAVIORS: recordReturned, recordFailed, recordOverlap, takeSnapshot (see above)
+
+ENTITY: RunStats (MODIFIED) — src/runner/RunStats.ts
+  FIELDS: copied, skipped, failed: number; + aborted: boolean (NEW)
 ```
 
 #### Integration Points
@@ -407,7 +425,12 @@ ENTITY: ActivityTotals (NEW)
 - from: Scheduler
   to: ActivityTotals
     - protocol: in-process method calls
-    - endpoints: recordCompleted/recordFailed/recordOverlap in executeTick; takeSnapshot in the summary interval
+    - endpoints: recordReturned/recordFailed/recordOverlap in executeTick; takeSnapshot in the summary interval and in stop()
+
+- from: ImportRunner / ExportRunner
+  to: Scheduler
+    - protocol: existing Promise<RunStats> return value
+    - data_flow: "RunStats now also carries aborted; set on the early-return paths that write a rule-failed entry before any file is processed"
     - data_flow: "RunStats + outcome kind → counters → snapshot → formatted line"
 
 - from: GeneralSubtab
@@ -457,7 +480,7 @@ if (!acquired) {
 }
 try {
 	const stats = await this.dispatchRunner(rule, dryRun);
-	this.activityTotals.recordCompleted(stats, dryRun);          // Rules 2, 5
+	this.activityTotals.recordReturned(stats, dryRun);           // Rules 2, 3 (aborted), 5
 	/* existing setIdle + log.debug tick end */
 } catch (err) {
 	this.activityTotals.recordFailed();                          // Rule 3
@@ -473,16 +496,20 @@ try {
 |---|---|---|---|---|---|---|---|---|
 | 0 | plugin load / snapshot reset | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | 1 | initial run, rule A ok {copied 3, skipped 1, failed 0} | 1 | 0 | 0 | 0 | 3 | 1 | 0 |
-| 2 | timer, rule B ok {0, 0, 2} (per-file failures) | 2 | 0 | 0 | 0 | 3 | 1 | 2 |
-| 3 | timer, rule A overlaps (still running) | 2 | 0 | 1 | 0 | 3 | 1 | 2 |
-| 4 | "Run now" dry run, rule B {would-write 5} | 2 | 0 | 1 | 1 | 3 | 1 | 2 |
-| 5 | timer, rule A runner throws | 2 | 1 | 1 | 1 | 3 | 1 | 2 |
-| 6 | 24 h mark → line written, counts reset | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| 2 | timer, rule B returns {copied 0, skipped 0, failed 2, aborted false} (per-file failures) | 2 | 0 | 0 | 0 | 3 | 1 | 2 |
+| 3 | "Run now", rule B dry run returns {copied 5, skipped 0, failed 0, aborted false} | 2 | 0 | 0 | 1 | 3 | 1 | 2 |
+| 4 | timer, rule A starts (in flight, nothing recorded yet) | 2 | 0 | 0 | 1 | 3 | 1 | 2 |
+| 5 | "Run now", rule A while the step-4 run is still in flight → overlap | 2 | 0 | 1 | 1 | 3 | 1 | 2 |
+| 6 | the step-4 run of rule A throws | 2 | 1 | 1 | 1 | 3 | 1 | 2 |
+| 7 | timer, rule C returns {copied 0, skipped 0, failed 0, aborted true} (source missing) | 2 | 2 | 1 | 1 | 3 | 1 | 2 |
+| 8 | 24 h mark → line written, counts reset | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 
-Line at step 6:
-`[Hakobi] daily summary: 2 runs, 1 failed, 1 overlap skip, 1 dry run; files 3 copied, 1 skipped, 2 failed`
+Line at step 8 (built by `formatDailySummary`, prefix included):
+`[Hakobi] daily summary: 2 completed, 2 failed, 1 overlap skip, 1 dry run; files 3 copied, 1 skipped, 2 failed`
 
-Edge: with no events, the line reads `0 runs, 0 failed, 0 overlap skips, 0 dry runs; files 0 copied, 0 skipped, 0 failed` (AC-3.4). Plural forms are applied per count, and the line has no rule names (AC-3.6).
+Four non-dry runs ended in the period (steps 1, 2, 6, 7): 2 completed and 2 failed. The dry run (step 3) and the overlap (step 5) are counted separately. "failed" after the run counts means failed runs; "failed" after "files" means failed files.
+
+Edge: with no events, the line reads `[Hakobi] daily summary: 0 completed, 0 failed, 0 overlap skips, 0 dry runs; files 0 copied, 0 skipped, 0 failed` (AC-3.4). Plurals apply per count ("1 overlap skip", "2 overlap skips"; "1 dry run", "0 dry runs"), and the line has no rule names (AC-3.6).
 
 #### Test Examples as Interface Documentation
 
@@ -490,8 +517,13 @@ Edge: with no events, the line reads `0 runs, 0 failed, 0 overlap skips, 0 dry r
 describe("ActivityTotals", () => {
 	it("keeps dry-run file results out of the file totals", () => {
 		const t = new ActivityTotals();
-		t.recordCompleted({ copied: 5, skipped: 0, failed: 0 }, true);
+		t.recordReturned({ copied: 5, skipped: 0, failed: 0, aborted: false }, true);
 		expect(t.takeSnapshot()).toMatchObject({ dryRuns: 1, completedRuns: 0, filesCopied: 0 });
+	});
+	it("counts an aborted run as failed, without file totals", () => {
+		const t = new ActivityTotals();
+		t.recordReturned({ copied: 0, skipped: 0, failed: 0, aborted: true }, false);
+		expect(t.takeSnapshot()).toMatchObject({ failedRuns: 1, completedRuns: 0 });
 	});
 	it("resets after a snapshot", () => {
 		const t = new ActivityTotals();
@@ -553,7 +585,8 @@ sequenceDiagram
 - **Save fails** (`saveGlobalSettings` rejects): this is existing behaviour, with the error surfaced by the existing save path. The in-memory value still reflects the toggle until reload.
 - **The provider throws** (it should not, since it is a property read): `log.debug` does not guard it. A throwing provider is a programming error that tests would catch.
 - **The summary interval fires after unload:** this cannot happen, because `stop()` cancels it and `registerInterval` also cleans up on unload.
-- **A run failure:** unchanged. It is `log.warn` with the rule name and `err.message`, a status-bar failure and an audit `rule-failed` entry. It is additionally counted as `failedRuns`.
+- **A run failure (throw):** unchanged. It is `log.warn` with the rule name and `err.message`, a status-bar failure and an audit `rule-failed` entry. It is additionally counted as `failedRuns`.
+- **An aborted run (`aborted: true`):** unchanged console behaviour. Today it writes no console line, only the runner's audit `rule-failed` entry with its error code. It is additionally counted as `failedRuns`. Adding a console line for it is out of scope.
 - **An uncaught rejection from `executeTick`** (the timer `.catch`, `log.error`): unchanged, always visible, and not counted, because no run outcome is known.
 
 ### Complex Logic (if applicable)
@@ -563,16 +596,17 @@ ALGORITHM: Daily summary
 INPUT: run outcomes from executeTick, wall-clock interval
 OUTPUT: one console line per 24 h
 
-1. On Scheduler.start(): reset is implicit (fresh ActivityTotals); schedule
+1. On Scheduler.start() (main.ts:471, before the initial run is dispatched at main.ts:486 after the 3 s grace, so the initial run lands in the first period): schedule
    window.setInterval(emit, DAILY_SUMMARY_INTERVAL_MS); registerInterval(id).
 2. On each outcome:
    - overlap            → overlapSkips += 1
-   - runner threw       → failedRuns   += 1
-   - returned, dryRun   → dryRuns      += 1
-   - returned, !dryRun  → completedRuns += 1; files* += stats.*
+   - runner threw                 → failedRuns    += 1
+   - returned, aborted            → failedRuns    += 1   (dry or not; no file totals)
+   - returned, !aborted, dryRun   → dryRuns       += 1
+   - returned, !aborted, !dryRun  → completedRuns += 1; files* += stats.*
 3. emit(): snapshot = takeSnapshot()  (returns counts, resets to zero)
            log.lifecycle(formatDailySummary(snapshot))   (even if all zero)
-4. On Scheduler.stop(): clear the summary interval. The counts are discarded (no unload summary — Could Have, not built).
+4. On Scheduler.stop(): clear the summary interval and call takeSnapshot(), dropping the result, so a later start() begins from zero. No unload summary is written (Could Have, not built).
 5. Sleep across the mark: the browser fires an overdue setInterval once on
    resume (no burst), so there is at most one line per resume.
 ```
@@ -585,7 +619,7 @@ No change. The plugin ships through the existing semantic-release pipeline as a 
 - **Environment:** Obsidian desktop (Electron), in-process.
 - **Configuration:** one new `GlobalSettings` field, defaulted.
 - **Dependencies:** none new.
-- **Performance:** negligible. There is one extra interval timer, one boolean read per gated log call, and seven integer increments per run.
+- **Performance:** negligible. There is one extra interval timer, one boolean read per gated log call, and at most four integer increments per run (one run counter plus three file sums).
 
 ### Multi-Component Coordination (if applicable)
 Not applicable. Only one component is involved.
@@ -615,7 +649,7 @@ Not applicable. Only one component is involved.
 ### User Interface & UX (if applicable)
 
 **Information Architecture:**
-- **Navigation:** Hakobi settings → General sub-tab. A new section is added at the end, after "Audit log". This mirrors Kado, where "Developer" comes last.
+- **Navigation:** Hakobi settings → General sub-tab. A new section is added after "Audit log", as in Kado (where "Developer" also follows "Audit logging"). In Hakobi it is the last section.
 - **Content Organization:** the new "Developer" heading (`setHeading()`) contains one toggle, "Debug logging".
 - **User Flows:** flip the toggle. It saves immediately, as every General setting already does.
 
@@ -623,7 +657,7 @@ Not applicable. Only one component is involved.
 - **Components:** Obsidian `Setting().addToggle()`, with `toggleEl.setAttribute("data-field", "debugLogging")` as the test hook. This follows the rule editors (`ImportRuleEditor.ts:349-358`).
 - **Copy:**
   - Name: "Debug logging".
-  - Description: "Write per-run details to the developer console (off by default). They appear only at the console's "Verbose" log level. Load events, errors and a daily summary are always written."
+  - Description (close to Kado's wording): "Write per-run details to the developer console (off by default). Requires the developer tools Verbose log level. Load events and a daily summary are always written at that level; errors always show." No nested quotes around Verbose, so the obsidianmd UI-text rules see plain sentence case.
   - Sentence case, as in Kado.
 - **Patterns:** no notices and no confirmation. The toggle is a reversible, low-risk preference.
 
@@ -637,11 +671,11 @@ Not applicable. Only one component is involved.
 │ General │ Import │ Export                     │
 ├───────────────────────────────────────────────┤
 │ Global settings                               │
-│   Per-file IO timeout (seconds)   [ 30 ]      │
+│   Per-file IO timeout (seconds)   [ 10 ]      │
 │   …                                           │
 │ Audit log                                     │
-│   Show audit log              [ Open ]        │
-│   Purge audit log             [ Purge ]       │
+│   Show audit log      [ Show audit log ]      │
+│   Purge audit log [ Purge audit log now ]     │
 │ Developer                              ← NEW  │
 │   Debug logging                 ( ○ )  ← NEW  │
 │   Write per-run details to the developer …    │
@@ -687,7 +721,7 @@ Not applicable. Only one component is involved.
     - A pure counter keeps the PRD's counting rules unit-testable (Constitution L1).
   - Trade-offs:
     - The scheduler gains one more responsibility (the summary cadence).
-    - The 24-hour clock starts at `start()` rather than at the exact load instant, a difference of milliseconds.
+    - The 24-hour clock starts at `start()` (main.ts:471, inside onload) rather than at the very first onload line. That is the same onload call, before the initial run is dispatched, so the initial run still counts toward the first period (PRD Rule 6).
   - User confirmed: 2026-11-27
 
 - [x] ADR-4 Persistence: a new required field `debugLogging: boolean` in `GlobalSettings` (data.json, synced), default `false`, merged with a `typeof === "boolean"` check. No `schemaVersion` bump.
@@ -696,7 +730,7 @@ Not applicable. Only one component is involved.
     - The change is additive with a default, so older data loads cleanly, and older Hakobi versions drop the unknown key.
   - Trade-offs:
     - Obsidian Sync spreads the switch to all devices (accepted in the PRD).
-    - About 8 test fixtures typed `GlobalSettings` must gain the field.
+    - 7 typed `GlobalSettings` fixture sites must gain the field (listed in the Directory Map). Untyped raw `loadData` fixtures (compliance, live tests) keep working via the merge default.
   - User confirmed: 2026-11-27
 
 - [x] ADR-5 Supersede spec 001's console rule: add a "Superseded by spec 002" note at the Logging/Auditing rule in `docs/XDD/specs/001-v0-1/solution.md`. The rule itself is not rewritten.
@@ -705,6 +739,15 @@ Not applicable. Only one component is involved.
     - Spec 002 is now the source of truth for console output.
     - A note keeps spec 001's history intact.
   - Trade-offs: readers of spec 001 must follow a pointer.
+  - User confirmed: 2026-11-27
+
+- [x] ADR-6 Aborted runs count as failed: `RunStats` gains `aborted: boolean`, set by the runners' early-return paths (scope refusal, source not found, export source unreadable). `ActivityTotals` counts a returned run with `aborted: true` as `failedRuns`.
+  - Rationale:
+    - These failures write `rule-failed` to the audit log but return normally, so without a signal the summary would report "0 failed" while a rule fails every run (the #15 Windows bug was exactly this shape).
+    - Keying on an explicit abort flag rather than on `rule-failed` avoids the import quirk where an all-skipped run is recorded as `rule-failed`.
+  - Trade-offs:
+    - The runner return type changes (one field); every `RunStats` literal and test fixture needs `aborted`.
+    - A run where every file fails per-file is not "aborted"; it counts as completed with files failed.
   - User confirmed: 2026-11-27
 
 ## Quality Requirements
@@ -752,14 +795,16 @@ Not applicable. Only one component is involved.
 - [ ] WHEN the scheduler stops (unload or reload), THE SYSTEM SHALL cancel the summary interval and discard the counts (AC-3.7)
 
 **Error Handling Criteria: PRD/AC-4.x — Privacy**
-- [ ] WHILE `debugLogging` is false, THE SYSTEM SHALL emit no rule name, file name or path in lifecycle or summary lines (AC-4.1)
+- [ ] WHILE `debugLogging` is false, THE SYSTEM SHALL emit no rule name, file name or path in lifecycle or summary lines, verified with a rule whose name is distinctive (AC-4.1)
 - [ ] WHEN a run fails, THE SYSTEM SHALL keep today's failure line with the rule name and the verbatim error message (AC-4.2)
-- [ ] THE SYSTEM SHALL never include note content, frontmatter values or file contents in any debug line (AC-4.3)
+- [ ] THE SYSTEM SHALL never include note content, frontmatter values or file contents in any debug line; tick lines carry only rule name, direction, dry-run tag, result counts or the error message (AC-4.3)
 - [ ] THE SYSTEM SHALL document the developer console in PRIVACY.md: what is written in each switch state, and that error messages may contain paths (AC-4.4)
 
 **Edge Case Criteria: PRD/AC-5.x and business-rule edges**
 - [ ] THE SYSTEM SHALL ship `docs/debug-logging.md`, the troubleshooting update (Verbose, switch, per-OS shortcut) and a configuration reference row with the default (AC-5.1–5.3)
-- [ ] IF a run throws, THEN THE SYSTEM SHALL increment `failedRuns` and add no file totals (Rule 3)
+- [ ] IF a run throws or returns `aborted: true`, THEN THE SYSTEM SHALL increment `failedRuns` and add no file totals (Rule 3)
+- [ ] IF a dry run throws or is aborted, THEN THE SYSTEM SHALL increment `failedRuns`, not `dryRuns` (Rule 5)
+- [ ] WHILE a rule is disabled on this device, THE SYSTEM SHALL record no outcome for it (Rule 7)
 - [ ] IF a tick is refused by the in-flight lock, THEN THE SYSTEM SHALL increment `overlapSkips` (Rule 4)
 - [ ] WHILE the switch changes during a period, THE SYSTEM SHALL keep the counts and the interval unchanged (Edge 3)
 
@@ -769,6 +814,8 @@ Not applicable. Only one component is involved.
 - `docs/troubleshooting.md:85` gives `Cmd/Ctrl + Shift + I`. On macOS the correct shortcut is `Cmd + Option + I`. This is fixed as part of F5.
 - `docs/configuration.md` shows ms units and the label "Audit max size (MB)", while the UI shows seconds and "Max log size (MB)". This is fixed while touching the table.
 - `docs/audit-log.md:38-50` shows a non-existent `"operation": "summary"` entry. It is out of scope, and a separate issue is proposed.
+- `ImportRunner` records `rule-failed` for an all-skipped run (L512-520), while `ExportRunner` records `rule-ok`. It is out of scope, and a separate issue is proposed.
+- `docs/configuration.md:10` embeds `assets/hakobi_general_settings.png`, which goes stale once the toggle ships. Regenerating the screenshot is a manual step for the maintainer.
 
 ### Technical Debt
 - `main.ts:59-64` duplicates `DEFAULT_GLOBAL_SETTINGS`. The new field would otherwise have to be added twice, so it is replaced with `{ ...DEFAULT_GLOBAL_SETTINGS }`.
@@ -782,6 +829,11 @@ Not applicable. Only one component is involved.
 - **`start()` schedules the summary interval once.** It is currently called exactly once (main.ts:471). If it is ever called twice, cancel any existing summary timer first.
 - **The `executeTick` overlap branch** returns before the try block, so record the overlap before the early `return`.
 - **Dry run plus failure** counts as `failedRuns` (Rule 3 applies before Rule 5).
+- **Existing registerInterval count assertions break.** `test/scheduler/Scheduler.test.ts` asserts exact call counts after `start()` (L173, 187, 195, 282, 339, 347, 376, 410, 416). Each gains +1 for the summary timer. Update them, or filter the calls by delay so the per-rule assertions stay focused.
+- **Never `vi.runAllTimers*()` with a real Scheduler.** The permanent 24-hour interval makes vitest hit its loop limit. Use `vi.advanceTimersByTime(...)` (see the existing warning in `test/lifecycle/unload.test.ts:183-185`).
+- **`_runCleanup()` does not call `onunload()`** (`test/__mocks__/obsidian.ts:168-171`). Tests that check the debug source is cleared must call `plugin.onunload()` first, as `test/main.test.ts:130-131` does.
+- **The General save wrapper is not reachable from tests directly.** `generalSubtab` is a local in `main.ts:373`. Capture its constructor deps with the `vi.mock` pattern from `test/main.scope-wiring.test.ts:17-40`.
+- **Import all-skipped quirk.** `ImportRunner` writes `rule-failed` when every file was skipped (L512-520). The summary deliberately does not key on `rule-failed` (it uses `aborted`), so that quirk does not inflate `failedRuns`. The quirk itself is out of scope.
 
 ## Glossary
 

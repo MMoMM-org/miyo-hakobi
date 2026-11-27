@@ -128,8 +128,8 @@ A second problem is privacy. The per-run lines print the user-chosen rule name i
 - **User Story:** As an everyday ferry user, I want one console line per day that sums up what the ferry did, so that I can confirm it is working without reading per-run detail.
 - **Acceptance Criteria (Gherkin Format):**
   - [ ] Given the plugin has been loaded for 24 hours, When the 24-hour mark passes, Then exactly one summary line appears covering all rules together
-  - [ ] Given runs happened during the period, When the summary line is written, Then it reports: completed runs, failed runs, overlap skips, and files copied, skipped and failed
-  - [ ] Given dry runs happened during the period, When the summary line is written, Then dry runs are reported as their own count, and their would-be file results are not added to the copied, skipped or failed numbers
+  - [ ] Given runs happened during the period, When the summary line is written, Then it reports: completed runs, failed runs (crashed or aborted, for example by a scope refusal or a missing source), overlap skips, and files copied, skipped and failed
+  - [ ] Given dry runs that ended normally happened during the period, When the summary line is written, Then dry runs are reported as their own count, and their would-be file results are not added to the copied, skipped or failed numbers
   - [ ] Given no runs happened during the period, When the 24-hour mark passes, Then a summary line with all counts at zero still appears, which shows the plugin is alive
   - [ ] Given a summary line was written, When the next period starts, Then its counts start again from zero
   - [ ] Given any switch state, When the summary line is written, Then it contains no rule names or file paths
@@ -182,9 +182,9 @@ A second problem is privacy. The per-run lines print the user-chosen rule name i
 **Business Rules:**
 - Rule 1: A period starts when the plugin loads and ends exactly 24 hours later, then repeats. It is not aligned to calendar days or midnight.
 - Rule 2: Every run that ends normally counts as one completed run, and its files add to the copied, skipped and failed totals.
-- Rule 3: Every run that ends with an unexpected failure counts as one failed run. It adds no file totals, because none are available.
+- Rule 3: A run counts as one failed run if it ends with an unexpected failure, or if it is aborted before processing files (for example, the rule's scope check refuses it or its source folder is missing). It adds no file totals. Per-file failures inside a run that otherwise proceeds do not make it a failed run; they add to the files-failed total instead.
 - Rule 4: Every run skipped because the same rule is still running counts as one overlap skip.
-- Rule 5: Dry runs count only toward a separate dry-run count. Their would-be results never enter the file totals.
+- Rule 5: Dry runs that end normally count only toward a separate dry-run count. Their would-be results never enter the file totals. A dry run that fails or is aborted counts as a failed run (Rule 3).
 - Rule 6: The initial run on plugin start counts like any other run.
 - Rule 7: Timers that do not fire because the rule is disabled on this device produce no run and are not counted.
 - Rule 8: The summary line never names a rule, file or path.
@@ -201,7 +201,7 @@ A second problem is privacy. The per-run lines print the user-chosen rule name i
 ### Key Performance Indicators
 
 - **Adoption:** The switch is off by default, so 100% of users get quiet output after updating with no action. Hakobi collects no usage data, so adoption of the switch itself is not measured.
-- **Engagement:** With debug logging off, Hakobi writes at most (load events + 1 summary line + failures) per 24 hours, down from 2 lines per run. Reference setup: 5 rules every 5 minutes, about 2,900 lines/day today, at most about 10 plus failures after the change.
+- **Engagement:** With debug logging off, Hakobi writes at most (load events + 1 summary line + failures) per 24 hours, down from 2 lines per run. Reference setup: 5 rules every 5 minutes, about 2,900 lines/day today, after the change exactly 6 load lines per plugin load, 1 summary line per 24 hours, and 1 line per failure.
 - **Quality:** No per-run line appears with the switch off, verified by automated tests for each run trigger (timer, "Run now", command). Turning the switch on or off takes effect on the next run, with no reload.
 - **Business Impact:** Fewer "console noise" complaints, and bug reports that include debug lines. This is judged qualitatively from GitHub issues; there is no telemetry.
 
@@ -249,7 +249,7 @@ Hakobi collects no analytics or telemetry (MiYo Constitution L1). Metrics are ch
 - [x] Shape of the summary: one aggregate line every 24 hours, in memory only, console only (decided 2026-11-27).
 - [x] Where the switch is stored: synced with the other General settings (decided 2026-11-27).
 - [x] Console privacy: rule names only in debug lines and failures; errors kept verbatim (decided 2026-11-27).
-- [ ] Should spec 001's design rule "console for errors only" (solution.md, Logging / Auditing) be formally superseded? Proposed: yes, in this spec's SDD.
+- [x] Spec 001's design rule "console for errors only" is formally superseded by this spec (decided 2026-11-27, SDD ADR-5).
 
 ---
 

@@ -5,7 +5,7 @@
 | Field | Value |
 |-------|-------|
 | **Created** | 2026-11-27 |
-| **Current Phase** | PLAN |
+| **Current Phase** | Ready |
 | **Decomposition tier** | Incremental |
 | **Model tier** | hard |
 | **Last Updated** | 2026-11-27 |
@@ -15,8 +15,8 @@
 | Document | Status | Notes |
 |----------|--------|-------|
 | requirements.md | completed | Approved 2026-11-27 |
-| solution.md | completed | Approved 2026-11-27; ADR-1..5 confirmed |
-| plan/ | in_progress | Incremental tier |
+| solution.md | completed | Approved 2026-11-27; ADR-1..6 confirmed |
+| plan/ | completed | Incremental tier; 3 phases, 12 tasks |
 
 **Status values**: `pending` | `in_progress` | `completed` | `skipped`
 
@@ -38,6 +38,9 @@
 | 2026-11-27 | SDD approved; ADR-1..ADR-5 confirmed | Logger channel split, provider-based debug source, ActivityTotals fed/timed by Scheduler, GlobalSettings.debugLogging (no schemaVersion bump), supersede-note in spec 001 |
 | 2026-11-27 | Decomposition tier: Incremental | Classifier recommended Incremental (feature_count=4 Must-Have; component_count=1 new: ActivityTotals; 26 ACs; no parallel markers). Accepted. |
 | 2026-11-27 | Model tier: hard | Classifier recommended hard (novel_pattern=true: logger channel split; adr_count=5; high_risks=0). Accepted. |
+| 2026-11-27 | Validation (2 agents: code alignment, 3Cs/ambiguity) applied to PRD/SDD/PLAN | 2 FAIL + ~20 WARN fixed: DEFAULT_GLOBAL_SETTINGS export, Kado placement claim, registerInterval count tests, fixture list, onunload vs _runCleanup, capture-deps pattern, no runAllTimers, stop() resets counts, summary wording "completed/failed", walkthrough order, toggle copy, missing tests (Rule 7, Edge 3, AC-4.1, AC-4.3). Ambiguity ~2% |
+| 2026-11-27 | ADR-6: aborted runs count as failed via `RunStats.aborted` | User chose to count non-throwing rule failures (scope refusal, missing source) as failed runs; keyed on an abort flag, not on `rule-failed`, to avoid the import all-skipped quirk |
+| 2026-11-27 | Plan complete: 3 phases, 12 tasks | Phase 1 foundations (logger, ActivityTotals, setting, runner abort flag), Phase 2 wiring + UI, Phase 3 docs + e2e |
 
 ## Context
 
