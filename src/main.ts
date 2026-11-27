@@ -45,7 +45,7 @@ import { HakobiSettingsTab } from "./settings/SettingsTab";
 import { ImportRuleEditor } from "./settings/editor/ImportRuleEditor";
 import { ExportRuleEditor } from "./settings/editor/ExportRuleEditor";
 import { validateRuleAtRunTime } from "./domain/scope";
-import { log } from "./util/logger";
+import { log, setDebugSource } from "./util/logger";
 
 import type { GlobalSettings } from "./types/index";
 import type { ImportRule } from "./domain/rule";
@@ -59,7 +59,9 @@ export default class HakobiPlugin extends Plugin {
   private globalSettings: GlobalSettings = { ...DEFAULT_GLOBAL_SETTINGS };
 
   async onload(): Promise<void> {
-    log.debug(`[Hakobi] plugin loading (${this.manifest.version})`);
+    // Live read: the General save wrapper updates this.globalSettings in memory.
+    setDebugSource(() => this.globalSettings.debugLogging);
+    log.lifecycle(`[Hakobi] plugin loading (${this.manifest.version})`);
 
     // ------------------------------------------------------------------
     // 1. NodeFs — timeout reads fresh from globalSettings on every call
@@ -496,11 +498,12 @@ export default class HakobiPlugin extends Plugin {
       retentionDays: this.globalSettings.auditRetentionDays,
     }).catch(() => undefined);
 
-    log.debug("[Hakobi] plugin loaded");
+    log.lifecycle("[Hakobi] plugin loaded");
   }
 
   onunload(): void {
-    log.debug("[Hakobi] plugin unloading");
+    log.lifecycle("[Hakobi] plugin unloading");
     this.scheduler?.stop();
+    setDebugSource(null);
   }
 }
