@@ -30,7 +30,8 @@ import {
 // ---------------------------------------------------------------------------
 
 export interface FsScopeAdapter {
-  /** POSIX realpath: resolves symlinks. Throws if path does not exist. */
+  /** realpath: resolves symlinks. Throws if path does not exist. May return
+   *  platform separators (backslashes on Windows) — scope.ts normalizes. */
   realpath(p: string): Promise<string>;
   /** lstat without following symlinks; only `isSymbolicLink()` is consumed here. */
   lstat(p: string): Promise<{ isSymbolicLink(): boolean }>;
@@ -65,10 +66,30 @@ export interface ScopeViolation {
 // Pure path helpers
 // ---------------------------------------------------------------------------
 
-/** Strip a trailing slash (but keep the root "/"). POSIX-only at this layer. */
-function stripTrailingSlash(p: string): string {
-  if (p.length > 1 && p.endsWith("/")) return p.slice(0, -1);
-  return p;
+/**
+ * Canonical spelling of a filesystem path for string comparison.
+ *
+ * Rule paths are stored with forward slashes (rule.ts canonicalFsPath), but on
+ * Windows `getBasePath()` and `realpath()` answer with backslashes — the
+ * latter sometimes with a `\\?\` extended-length prefix — and drive letters
+ * can differ in case. Comparing the raw strings refuses every Windows rule as
+ * an escape and, worse, makes the vault-loop guard stop matching. So every
+ * comparison below goes through this: strip `\\?\`, `\` → `/`, collapse runs
+ * of `/`, upper-case the drive letter, trim the trailing separator (keeping
+ * the roots `/` and `X:/`). On POSIX input it only trims and collapses.
+ */
+function comparablePath(p: string): string {
+  let out = p.replace(/^\\\\\?\\/, "").replace(/\\/g, "/").replace(/\/+/g, "/");
+  if (/^[a-z]:/.test(out)) out = out.charAt(0).toUpperCase() + out.slice(1);
+  if (out.length > 1 && out.endsWith("/") && !/^[A-Za-z]:\/$/.test(out)) {
+    out = out.slice(0, -1);
+  }
+  return out;
+}
+
+/** `${root}/` — the prefix a strictly nested path starts with. */
+function childPrefix(root: string): string {
+  return root.endsWith("/") ? root : `${root}/`;
 }
 
 function hasTraversalSegment(p: string): boolean {
@@ -84,10 +105,10 @@ function hasTraversalSegment(p: string): boolean {
  */
 export function isInsideRoot(p: string, root: string): boolean {
   if (hasTraversalSegment(p)) return false;
-  const a = stripTrailingSlash(p);
-  const b = stripTrailingSlash(root);
+  const a = comparablePath(p);
+  const b = comparablePath(root);
   if (a === b) return false;
-  return a.startsWith(`${b}/`);
+  return a.startsWith(childPrefix(b));
 }
 
 /**
@@ -97,10 +118,10 @@ export function isInsideRoot(p: string, root: string): boolean {
  */
 export function isVaultPath(p: string, vaultRoot: string): boolean {
   if (hasTraversalSegment(p)) return false;
-  const a = stripTrailingSlash(p);
-  const b = stripTrailingSlash(vaultRoot);
+  const a = comparablePath(p);
+  const b = comparablePath(vaultRoot);
   if (a === b) return true;
-  return a.startsWith(`${b}/`);
+  return a.startsWith(childPrefix(b));
 }
 
 /**
@@ -123,9 +144,9 @@ export function isForbiddenVaultPath(
   pluginDir: string,
 ): boolean {
   if (hasTraversalSegment(p)) return true; // defence-in-depth
-  const a = stripTrailingSlash(p);
-  const v = stripTrailingSlash(vaultRoot);
-  const plug = stripTrailingSlash(pluginDir);
+  const a = comparablePath(p);
+  const v = comparablePath(vaultRoot);
+  const plug = comparablePath(pluginDir);
 
   if (a === v) return true;
   if (a === plug || a.startsWith(`${plug}/`)) return true;
@@ -141,9 +162,9 @@ export function isForbiddenVaultPath(
   return false;
 }
 
-/** Return the parent directory of an absolute POSIX path, or null if at root. */
+/** Return the parent directory of an absolute path, or null if at root. */
 function parentOf(p: string): string | null {
-  const stripped = stripTrailingSlash(p);
+  const stripped = comparablePath(p);
   const idx = stripped.lastIndexOf("/");
   if (idx <= 0) return null;
   return stripped.slice(0, idx);
@@ -163,8 +184,12 @@ function violation(
 
 const OK: Result<void, ScopeViolation> = { ok: true, value: undefined };
 
-function isAbsolutePosix(p: string): boolean {
-  return p.startsWith("/");
+/**
+ * POSIX root (`/…`) or Windows drive (`C:/…`, `C:\\…`). Mirrors PathSafe's
+ * isAbsolute so a path the editor accepts is not refused here (#15).
+ */
+function isAbsoluteFsPath(p: string): boolean {
+  return p.startsWith("/") || /^[A-Za-z]:[/\\]/.test(p);
 }
 
 /**
@@ -173,13 +198,13 @@ function isAbsolutePosix(p: string): boolean {
  * separately (vault root case).
  */
 function checkVaultRelative(p: string): Result<void, ScopeViolation> {
-  if (isAbsolutePosix(p)) return violation("traversal", p, "vault-relative path must not be absolute");
+  if (isAbsoluteFsPath(p)) return violation("traversal", p, "vault-relative path must not be absolute");
   if (hasTraversalSegment(p)) return violation("traversal", p, "`..` segment in vault-relative path");
   return OK;
 }
 
 function checkAbsolute(p: string): Result<void, ScopeViolation> {
-  if (!isAbsolutePosix(p)) return violation("traversal", p, "filesystem path must be absolute");
+  if (!isAbsoluteFsPath(p)) return violation("traversal", p, "filesystem path must be absolute");
   if (hasTraversalSegment(p)) return violation("traversal", p, "`..` segment in absolute path");
   return OK;
 }
@@ -196,8 +221,8 @@ function checkVaultRelativeNotForbidden(
   const trimmed = vrel.replace(/^\/+/, "").replace(/\/+$/, "");
   const abs =
     trimmed === ""
-      ? stripTrailingSlash(vaultRoot)
-      : `${stripTrailingSlash(vaultRoot)}/${trimmed}`;
+      ? comparablePath(vaultRoot)
+      : `${childPrefix(comparablePath(vaultRoot))}${trimmed}`;
   if (isForbiddenVaultPath(abs, vaultRoot, pluginDir)) {
     return violation(
       "forbidden-path",
@@ -375,7 +400,10 @@ export async function validateRuleAtRunTime(
 
   // 4. Realpath escape check on source root.
   const realSrc = await fs.realpath(sourceRootAbs);
-  if (realSrc !== sourceRootAbs && !isInsideRoot(realSrc, sourceRootAbs)) {
+  if (
+    comparablePath(realSrc) !== comparablePath(sourceRootAbs) &&
+    !isInsideRoot(realSrc, sourceRootAbs)
+  ) {
     return violation(
       "escape",
       sourceRootAbs,
@@ -398,7 +426,7 @@ export async function validateRuleAtRunTime(
   // 6. Validate enumerated child name shapes (defensive — caller-supplied).
   if (options.childNames !== undefined) {
     for (const name of options.childNames) {
-      if (isAbsolutePosix(name)) {
+      if (isAbsoluteFsPath(name)) {
         return violation("absolute-in-filename", name, "child name is an absolute path");
       }
       if (hasTraversalSegment(name)) {
@@ -415,7 +443,10 @@ export async function validateRuleAtRunTime(
         return violation("symlink", child, "enumerated child is a symlink");
       }
       const realChild = await fs.realpath(child);
-      if (realChild !== child && !isInsideRoot(realChild, sourceRootAbs)) {
+      if (
+        comparablePath(realChild) !== comparablePath(child) &&
+        !isInsideRoot(realChild, sourceRootAbs)
+      ) {
         return violation(
           "escape",
           child,
