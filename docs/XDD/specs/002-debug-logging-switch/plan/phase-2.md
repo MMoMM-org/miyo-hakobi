@@ -1,6 +1,6 @@
 ---
 title: "Phase 2: Wiring and settings UI"
-status: in_progress
+status: completed
 version: "1.0"
 phase: 2
 ---
@@ -32,7 +32,7 @@ phase: 2
 
 This phase connects the building blocks: run outcomes reach the counter, the daily summary fires, load lines stay visible, the switch gates the per-run detail live, and the user can toggle it.
 
-- [ ] **T2.1 Scheduler: outcome recording, daily summary, lifecycle lines** `[activity: backend-api]` `[parallel: true]`
+- [x] **T2.1 Scheduler: outcome recording, daily summary, lifecycle lines** `[activity: backend-api]` `[parallel: true]`
 
   1. Prime: Read `src/scheduler/Scheduler.ts` (`start`, `runInitialRun`, `stop`, `scheduleTimer`, `executeTick`) and the SDD complex-logic algorithm `[ref: SDD/Runtime View/Complex Logic]`.
   2. Test (`test/scheduler/Scheduler.test.ts`):
@@ -64,7 +64,7 @@ This phase connects the building blocks: run outcomes reach the counter, the dai
      - Failures are visible and name the rule. `[ref: PRD/AC-2.4, AC-4.2]`
      - The daily cadence, the zero line, and stop/reload all behave as specified. `[ref: PRD/AC-3.1, AC-3.4, AC-3.7]`
 
-- [ ] **T2.2 main.ts wiring: debug source and lifecycle lines** `[activity: backend-api]` `[parallel: true]`
+- [x] **T2.2 main.ts wiring: debug source and lifecycle lines** `[activity: backend-api]` `[parallel: true]`
 
   1. Prime: Read `src/main.ts` (onload L67, save wrapper L373-397, scheduler start L471, onunload L504-510) and the integration points `[ref: SDD/Integration Points]`.
   2. Test (new `test/main.debug-logging.test.ts`):
@@ -82,7 +82,7 @@ This phase connects the building blocks: run outcomes reach the counter, the dai
      - The switch takes effect live. `[ref: PRD/AC-1.2, AC-1.3]`
      - Load and unload lines are always shown. `[ref: PRD/AC-2.2, AC-2.3]`
 
-- [ ] **T2.3 General settings: Developer heading and Debug logging toggle** `[activity: frontend-ui]` `[parallel: true]`
+- [x] **T2.3 General settings: Developer heading and Debug logging toggle** `[activity: frontend-ui]` `[parallel: true]`
 
   1. Prime:
      - Read `src/settings/subtabs/GeneralSubtab.ts`.
@@ -103,6 +103,6 @@ This phase connects the building blocks: run outcomes reach the counter, the dai
      - The toggle is under the "Developer" heading and off by default. `[ref: PRD/AC-1.1]`
      - The description states the default and the Verbose requirement. `[ref: PRD/AC-1.6]`
 
-- [ ] **T2.4 Phase Validation** `[activity: validate]`
+- [x] **T2.4 Phase Validation** `[activity: validate]`
 
   - Run all Phase 2 tests. Check the three changed files against the SDD Runtime View and the UX section. `npm test`, `npm run lint` and `npm run build` pass.
