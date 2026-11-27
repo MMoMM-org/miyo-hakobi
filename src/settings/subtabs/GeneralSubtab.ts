@@ -23,6 +23,10 @@ type NumericSettingKey = {
 	[K in keyof GlobalSettings]: GlobalSettings[K] extends number ? K : never;
 }[keyof GlobalSettings];
 
+// Copy for the Developer section toggle (spec 002, UX section). Kept verbatim.
+const DEBUG_LOGGING_DESC =
+	"Write per-run details to the developer console (off by default). Requires the developer tools Verbose log level. Load events and a daily summary are always written at that level; errors always show.";
+
 export interface GeneralSubtabDeps {
 	ruleStore: {
 		loadGlobalSettings(): Promise<GlobalSettings>;
@@ -149,6 +153,23 @@ export class GeneralSubtab {
 			.addButton((btn) => {
 				btn.setButtonText("Purge audit log now").setWarning().onClick(() => {
 					void this._purgeAuditLog();
+				});
+			});
+
+		// -----------------------------------------------------------------------
+		// Section: Developer
+		// -----------------------------------------------------------------------
+
+		new Setting(containerEl).setName("Developer").setHeading();
+
+		// Field: Debug logging — saves immediately, like every General setting
+		new Setting(containerEl)
+			.setName("Debug logging")
+			.setDesc(DEBUG_LOGGING_DESC)
+			.addToggle((toggle) => {
+				toggle.toggleEl.setAttribute("data-field", "debugLogging");
+				toggle.setValue(current.debugLogging).onChange((value) => {
+					void save({ ...current, debugLogging: value });
 				});
 			});
 	}
