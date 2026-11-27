@@ -5,9 +5,9 @@
 | Field | Value |
 |-------|-------|
 | **Created** | 2026-11-27 |
-| **Current Phase** | SDD |
-| **Decomposition tier** | {{DECOMPOSITION_TIER}} |
-| **Model tier** | {{MODEL_TIER}} |
+| **Current Phase** | PLAN |
+| **Decomposition tier** | Incremental |
+| **Model tier** | hard |
 | **Last Updated** | 2026-11-27 |
 
 ## Documents
@@ -15,8 +15,8 @@
 | Document | Status | Notes |
 |----------|--------|-------|
 | requirements.md | completed | Approved 2026-11-27 |
-| solution.md | in_progress | |
-| plan/ | pending | |
+| solution.md | completed | Approved 2026-11-27; ADR-1..5 confirmed |
+| plan/ | in_progress | Incremental tier |
 
 **Status values**: `pending` | `in_progress` | `completed` | `skipped`
 
@@ -35,6 +35,9 @@
 | 2026-11-27 | Debug switch stored in `GlobalSettings` (data.json, synced) | Consistent with all other global settings and with Kado; per-device storage rejected |
 | 2026-11-27 | Privacy: rule names only in opt-in debug lines; load + totals lines carry no rule names; error messages kept verbatim; new console section in PRIVACY.md | Diagnosis needs raw errors; default output stays free of user-chosen names |
 | 2026-11-27 | PRD approved (26 acceptance criteria) | Includes: failures always name the rule; dry runs counted separately; zero-activity summary still emitted; initial-run start/end are load events; no catch-up summaries after sleep |
+| 2026-11-27 | SDD approved; ADR-1..ADR-5 confirmed | Logger channel split, provider-based debug source, ActivityTotals fed/timed by Scheduler, GlobalSettings.debugLogging (no schemaVersion bump), supersede-note in spec 001 |
+| 2026-11-27 | Decomposition tier: Incremental | Classifier recommended Incremental (feature_count=4 Must-Have; component_count=1 new: ActivityTotals; 26 ACs; no parallel markers). Accepted. |
+| 2026-11-27 | Model tier: hard | Classifier recommended hard (novel_pattern=true: logger channel split; adr_count=5; high_risks=0). Accepted. |
 
 ## Context
 
