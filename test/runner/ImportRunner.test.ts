@@ -278,8 +278,9 @@ describe("ImportRunner", () => {
 
     const rule = makeRule({ flattenOnTarget: false });
     const runner = buildRunner({ fakeFs, fakeVault, auditLog });
-    await runner.run(rule);
+    const stats = await runner.run(rule);
 
+    expect(stats).toEqual({ copied: 1, skipped: 0, failed: 0, aborted: false });
     // Expect the file was written to the vault
     expect(fakeVault.writeBinaryCount).toBe(1);
 
@@ -477,8 +478,9 @@ describe("ImportRunner", () => {
 
     const rule = makeRule();
     const runner = buildRunner({ fakeFs, fakeVault, auditLog, scopeResult });
-    await runner.run(rule);
+    const stats = await runner.run(rule);
 
+    expect(stats).toEqual({ copied: 0, skipped: 0, failed: 0, aborted: true });
     // Only one entry: rule-failed
     expect(auditLog.entries).toHaveLength(1);
     const failEntry = auditLog.entries[0];
@@ -600,8 +602,9 @@ describe("ImportRunner", () => {
     // /src dir does NOT exist in fakeFs — readdir will throw IoNotFoundError
     const rule = makeRule();
     const runner = buildRunner({ fakeFs, fakeVault, auditLog });
-    await runner.run(rule);
+    const stats = await runner.run(rule);
 
+    expect(stats).toEqual({ copied: 0, skipped: 0, failed: 0, aborted: true });
     expect(auditLog.entries).toHaveLength(1);
     expect(auditLog.entries[0].decision).toBe("rule-failed");
     expect(auditLog.entries[0].errorCode).toBe("source-not-found");
@@ -736,8 +739,10 @@ describe("ImportRunner", () => {
 
     const rule = makeRule();
     const runner = buildRunner({ fakeFs, fakeVault, auditLog, stabilityCheckMs: 2000 });
-    await runner.run(rule);
+    const stats = await runner.run(rule);
 
+    // All-skipped run is a completed run, not an abort (ADR-6)
+    expect(stats).toEqual({ copied: 0, skipped: 1, failed: 0, aborted: false });
     const ruleEntry = auditLog.entries[auditLog.entries.length - 1];
     // skipped-only entries → rule-failed (no ok)
     expect(ruleEntry.decision).toBe("rule-failed");

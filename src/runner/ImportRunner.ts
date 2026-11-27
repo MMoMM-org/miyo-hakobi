@@ -140,7 +140,7 @@ export class ImportRunner {
         decision: "rule-failed",
         errorCode: mapScopeViolationToErrorCode(scopeResult.errors.reason),
       });
-      return { ...EMPTY_STATS };
+      return { ...EMPTY_STATS, aborted: true };
     }
 
     // -----------------------------------------------------------------------
@@ -158,7 +158,7 @@ export class ImportRunner {
           decision: "rule-failed",
           errorCode: "source-not-found",
         });
-        return { ...EMPTY_STATS };
+        return { ...EMPTY_STATS, aborted: true };
       }
       throw err;
     }
@@ -542,7 +542,7 @@ export class ImportRunner {
 /** Tally per-file outcomes into a RunStats object. FileOutcome is a strict
  *  subset of Decision so the shared `tally` helper applies directly. */
 function outcomesToStats(outcomes: FileOutcome[]): RunStats {
-  const stats: RunStats = { copied: 0, skipped: 0, failed: 0 };
+  const stats: RunStats = { copied: 0, skipped: 0, failed: 0, aborted: false };
   for (const o of outcomes) tally(stats, o);
   return stats;
 }

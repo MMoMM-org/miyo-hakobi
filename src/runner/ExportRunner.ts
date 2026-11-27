@@ -95,7 +95,7 @@ export class ExportRunner {
   async run(rule: ExportRule, opts?: { dryRun?: boolean }): Promise<RunStats> {
     const dryRun = opts?.dryRun ?? rule.dryRun;
     const ts = this.nowFn().toISOString();
-    const stats: RunStats = { copied: 0, skipped: 0, failed: 0 };
+    const stats: RunStats = { copied: 0, skipped: 0, failed: 0, aborted: false };
 
     // Step 0 (note rules only): existence pre-check.
     //
@@ -116,6 +116,7 @@ export class ExportRunner {
       const file = this.vaultIo.fileByPath(rule.sourceVaultNotePath);
       if (file === null) {
         await this.appendRuleFailed(rule, ts, "source-not-found");
+        stats.aborted = true;
         return stats;
       }
     }
@@ -128,6 +129,7 @@ export class ExportRunner {
         ts,
         mapScopeViolationToErrorCode(scopeResult.errors.reason),
       );
+      stats.aborted = true;
       return stats;
     }
 
@@ -137,6 +139,7 @@ export class ExportRunner {
     const parentMissing = await this.checkDestinationParent(rule.destinationPath);
     if (parentMissing) {
       await this.appendRuleFailed(rule, ts, "destination-parent-missing");
+      stats.aborted = true;
       return stats;
     }
 
@@ -146,6 +149,7 @@ export class ExportRunner {
       await this.nodeFs.mkdir(rule.destinationPath);
     } catch {
       await this.appendRuleFailed(rule, ts, "destination-parent-missing");
+      stats.aborted = true;
       return stats;
     }
 
@@ -153,6 +157,7 @@ export class ExportRunner {
     const files = await this.enumerateSource(rule, ts);
     if (files === null) {
       // enumerateSource already wrote the rule-failed entry.
+      stats.aborted = true;
       return stats;
     }
 
