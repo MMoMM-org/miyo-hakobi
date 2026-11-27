@@ -55,6 +55,7 @@ export interface GlobalSettings {
 	auditRetentionDays: number; // F5; default 90
 	auditMaxBytes: number; // F5; default 10485760 (10 MB)
 	stabilityCheckMs: number; // mtime-stable window; default 2000
+	debugLogging: boolean; // spec 002; default false
 }
 
 export interface DeviceState {

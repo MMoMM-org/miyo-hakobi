@@ -51,18 +51,20 @@ describe("src/types/index re-export surface", () => {
 		expect(entry.decision).toBe("ok");
 	});
 
-	it("exports GlobalSettings with the four documented fields", () => {
+	it("exports GlobalSettings with the five documented fields", () => {
 		const gs: GlobalSettings = {
 			perFileTimeoutMs: 1,
 			auditRetentionDays: 1,
 			auditMaxBytes: 1,
 			stabilityCheckMs: 1,
+			debugLogging: false,
 		};
 		// Each field is read so the assertion is a real runtime check too.
 		expect(gs.perFileTimeoutMs).toBe(1);
 		expect(gs.auditRetentionDays).toBe(1);
 		expect(gs.auditMaxBytes).toBe(1);
 		expect(gs.stabilityCheckMs).toBe(1);
+		expect(gs.debugLogging).toBe(false);
 	});
 
 	it("exports DeviceState with the documented fields", () => {
@@ -82,6 +84,7 @@ describe("src/types/index re-export surface", () => {
 			auditRetentionDays: 90,
 			auditMaxBytes: 10_485_760,
 			stabilityCheckMs: 2_000,
+			debugLogging: false,
 		};
 		const data: PluginData = {
 			schemaVersion: 1,

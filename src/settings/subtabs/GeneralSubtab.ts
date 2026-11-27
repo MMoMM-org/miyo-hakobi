@@ -18,6 +18,11 @@ import type { GlobalSettings } from "../../types/index";
 // Deps interface
 // ---------------------------------------------------------------------------
 
+// Keys of GlobalSettings that hold numbers; the numeric input helper only edits these.
+type NumericSettingKey = {
+	[K in keyof GlobalSettings]: GlobalSettings[K] extends number ? K : never;
+}[keyof GlobalSettings];
+
 export interface GeneralSubtabDeps {
 	ruleStore: {
 		loadGlobalSettings(): Promise<GlobalSettings>;
@@ -157,7 +162,7 @@ export class GeneralSubtab {
 		opts: {
 			name: string;
 			desc: string;
-			field: keyof GlobalSettings;
+			field: NumericSettingKey;
 			getCurrent: () => GlobalSettings;
 			save: (next: GlobalSettings) => Promise<void>;
 			/**

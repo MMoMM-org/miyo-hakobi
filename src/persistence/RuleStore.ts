@@ -48,11 +48,12 @@ interface PersistedData {
 // Defaults
 // ---------------------------------------------------------------------------
 
-const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
+export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
 	perFileTimeoutMs: 10000,
 	auditRetentionDays: 90,
 	auditMaxBytes: 10485760,
 	stabilityCheckMs: 2000,
+	debugLogging: false,
 };
 
 const CURRENT_SCHEMA_VERSION = 1 as const;
@@ -294,6 +295,10 @@ export class RuleStore {
 				typeof partial.stabilityCheckMs === "number"
 					? partial.stabilityCheckMs
 					: DEFAULT_GLOBAL_SETTINGS.stabilityCheckMs,
+			debugLogging:
+				typeof partial.debugLogging === "boolean"
+					? partial.debugLogging
+					: DEFAULT_GLOBAL_SETTINGS.debugLogging,
 		};
 	}
 }

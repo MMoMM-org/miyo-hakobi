@@ -26,7 +26,7 @@ import { NodeFs } from "./fs/NodeFs";
 import { VaultIo } from "./vault/VaultIo";
 import { AuditLog } from "./audit/AuditLog";
 import { Rotation } from "./audit/Rotation";
-import { RuleStore } from "./persistence/RuleStore";
+import { RuleStore, DEFAULT_GLOBAL_SETTINGS } from "./persistence/RuleStore";
 import { DeviceStore } from "./persistence/DeviceStore";
 import { InFlightRegistry } from "./scheduler/InFlightRegistry";
 import { Scheduler } from "./scheduler/Scheduler";
@@ -56,12 +56,7 @@ export default class HakobiPlugin extends Plugin {
   // Hold a reference to settingsTab so StatusBar.openSettings can deep-link.
   private settingsTab!: HakobiSettingsTab;
   // Hold globalSettings in memory after load; refreshed by saveGlobalSettings.
-  private globalSettings: GlobalSettings = {
-    perFileTimeoutMs: 10000,
-    auditRetentionDays: 90,
-    auditMaxBytes: 10485760,
-    stabilityCheckMs: 2000,
-  };
+  private globalSettings: GlobalSettings = { ...DEFAULT_GLOBAL_SETTINGS };
 
   async onload(): Promise<void> {
     log.debug(`[Hakobi] plugin loading (${this.manifest.version})`);

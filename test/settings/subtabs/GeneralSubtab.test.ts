@@ -38,6 +38,7 @@ const SEED_SETTINGS: GlobalSettings = {
 	auditRetentionDays: 90,
 	auditMaxBytes: 10485760,
 	stabilityCheckMs: 2000,
+	debugLogging: false,
 };
 
 const AUDIT_PATH = "/audit/2026-05.ndjson";
